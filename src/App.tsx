@@ -57,14 +57,13 @@ function App() {
   const handleExport = () => {
     // Remove the targetJobDescription from export to keep it strictly resume content
     const { targetJobDescription, ...exportData } = resumeData;
-    const dataStr = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
+    const dataStr = encodeURIComponent(JSON.stringify(exportData, null, 2));
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `resume_data.json`;
+    a.href = 'data:text/json;charset=utf-8,' + dataStr;
+    a.download = 'resume_data.json';
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   };
 
   const t = getTranslation(resumeData.language).app;

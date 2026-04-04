@@ -279,9 +279,9 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
              <div className="mb-4">
               <label className="block text-sm font-medium text-gray-600 mb-2">{t.skills}</label>
               <textarea 
-                value={data.skills.map(s => s.name).join(', ')} 
+                value={data.skills.map(s => s.name).join(',')} 
                 onChange={(e) => {
-                  const items = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                  const items = e.target.value.split(',');
                   handleFieldChange('skills', items.map((name, i) => ({ id: `sk-${i}`, name })));
                 }}
                 className="w-full p-2 border border-gray-300 rounded focus:border-blue-500" 
@@ -289,12 +289,43 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
                 placeholder={t.skillsPlaceholder}
               />
             </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-600 mb-2">{t.languages}</label>
+              {data.resumeLanguages.map((lang) => (
+                <div key={lang.id} className="grid grid-cols-4 gap-2 mb-2 relative pr-8">
+                  <div className="col-span-2">
+                    <input type="text" value={lang.name} placeholder="English, Français..." onChange={(e) => updateArrayItem('resumeLanguages', lang.id, { name: e.target.value })} className="w-full p-2 text-sm border border-gray-300 rounded focus:border-blue-500" />
+                  </div>
+                  <div className="col-span-2 relative flex items-center pr-2">
+                    <select value={lang.level} onChange={(e) => updateArrayItem('resumeLanguages', lang.id, { level: Number(e.target.value) })} className="w-full p-2 text-xl tracking-widest border border-gray-300 rounded focus:border-blue-500 appearance-none bg-white text-yellow-500">
+                      <option value={1}>★☆☆</option>
+                      <option value={2}>★★☆</option>
+                      <option value={3}>★★★</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center px-1 text-gray-400">
+                      <ChevronDown size={14} />
+                    </div>
+                  </div>
+                  <button onClick={() => removeArrayItem('resumeLanguages', lang.id)} className="absolute right-0 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-600 p-1">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+              <button 
+                onClick={() => addArrayItem('resumeLanguages', { id: Date.now().toString(), name: '', level: 2 })}
+                className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium mt-1"
+              >
+                <Plus size={16} className="mr-1" /> {t.addLanguage}
+              </button>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-2">{t.interests}</label>
               <textarea 
-                value={data.interests.map(i => i.name).join(', ')} 
+                value={data.interests.map(i => i.name).join(',')} 
                 onChange={(e) => {
-                  const items = e.target.value.split(',').map(i => i.trim()).filter(Boolean);
+                  const items = e.target.value.split(',');
                   handleFieldChange('interests', items.map((name, i) => ({ id: `int-${i}`, name })));
                 }}
                 className="w-full p-2 border border-gray-300 rounded focus:border-blue-500" 

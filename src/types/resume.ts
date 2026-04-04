@@ -39,6 +39,12 @@ export interface Interest {
   name: string;
 }
 
+export interface ResumeLanguage {
+  id: string;
+  name: string;
+  level: number; // 1 to 3
+}
+
 // Support multiple languages internally
 export type Language = 'en' | 'fr';
 
@@ -49,6 +55,7 @@ export interface ResumeData {
   experience: Experience[];
   education: Education[];
   skills: Skill[];
+  resumeLanguages: ResumeLanguage[];
   interests: Interest[]; // Newly added
   targetJobDescription?: string; // Newly added for ATS Optimizer
 }
@@ -92,6 +99,10 @@ export const initialResumeState: ResumeData = {
     { id: 'sk-1', name: 'React' },
     { id: 'sk-2', name: 'TypeScript' },
     { id: 'sk-3', name: 'Node.js' }
+  ],
+  resumeLanguages: [
+    { id: 'lang-1', name: 'English', level: 3 },
+    { id: 'lang-2', name: 'French', level: 2 }
   ],
   interests: [
     { id: 'int-1', name: 'Open Source Software' },

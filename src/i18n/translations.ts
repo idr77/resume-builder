@@ -38,6 +38,9 @@ export const translations = {
       skillsInterests: 'Skills & Interests',
       skills: 'Skills (Comma separated)',
       skillsPlaceholder: 'React, TypeScript, Project Management...',
+      languages: 'Languages',
+      addLanguage: 'Add Language',
+      level: 'Level (1-3)',
       interests: 'Interests (Comma separated)',
       interestsPlaceholder: 'Photography, Hiking, Open Source...'
     },
@@ -86,6 +89,9 @@ export const translations = {
       skillsInterests: 'Compétences & Centres d\'intérêt',
       skills: 'Compétences (Séparées par des virgules)',
       skillsPlaceholder: 'Java, Python, Gestion de projet...',
+      languages: 'Langues',
+      addLanguage: 'Ajouter une langue',
+      level: 'Niveau (1-3)',
       interests: 'Centres d\'intérêt (Séparés par des virgules)',
       interestsPlaceholder: 'Nouvelles technologies, Escalade, Natation...'
     },

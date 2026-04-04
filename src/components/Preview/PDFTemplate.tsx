@@ -1,5 +1,5 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image, Svg, Path } from '@react-pdf/renderer';
 import type { ResumeData } from '../../types/resume';
 
 // Define the exact styling referencing the user's uploaded model
@@ -171,6 +171,17 @@ interface Props {
   template?: 'classic' | 'modern' | 'executive';
 }
 
+const StarIcon = ({ filled }: { filled: boolean }) => (
+  <Svg viewBox="0 0 24 24" style={{ width: 8, height: 8, marginRight: 2 }}>
+    <Path
+      d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+      fill={filled ? "#FBBF24" : "none"}
+      stroke="#FBBF24"
+      strokeWidth={1.5}
+    />
+  </Svg>
+);
+
 const renderStyledText = (text: string) => {
   const parts = text.split(/(\*\*.*?\*\*|__.*?__|\*.*?\*|_.*?_)/g);
   return parts.map((part, index) => {
@@ -245,6 +256,13 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
                 <Text style={styles.sidebarText}>{data.personalInfo.linkedin}</Text>
               </View>
             )}
+
+            {data.personalInfo.portfolio && (
+              <View style={styles.sidebarTextContent}>
+                <Text style={styles.sidebarLabel}>Portfolio</Text>
+                <Text style={styles.sidebarText}>{data.personalInfo.portfolio}</Text>
+              </View>
+            )}
           </View>
 
           {/* Formation (Education on the Left) */}
@@ -262,14 +280,34 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
           )}
 
           {/* Skills */}
-          {data.skills.length > 0 && (
+          {data.skills.filter(s => s.name.trim()).length > 0 && (
             <View style={styles.sidebarSection}>
               <Text style={styles.sidebarTitle}>{strings.skills}</Text>
               <View style={styles.tagsContainer}>
-                {data.skills.map(skill => (
+                {data.skills.filter(s => s.name.trim()).map(skill => (
                   <Text key={skill.id} style={styles.tag}>{skill.name}</Text>
                 ))}
               </View>
+            </View>
+          )}
+
+          {/* Languages */}
+          {data.resumeLanguages.filter(l => l.name.trim()).length > 0 && (
+            <View style={styles.sidebarSection}>
+              <Text style={styles.sidebarTitle}>{strings.languages}</Text>
+              {data.resumeLanguages.filter(l => l.name.trim()).map(lang => {
+                const level = Math.max(1, Math.min(3, lang.level));
+                return (
+                  <View key={lang.id} style={{ marginBottom: 6 }}>
+                    <Text style={styles.sidebarLabel}>{lang.name}</Text>
+                    <View style={{ flexDirection: 'row', marginTop: 3 }}>
+                      <StarIcon filled={level >= 1} />
+                      <StarIcon filled={level >= 2} />
+                      <StarIcon filled={level >= 3} />
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           )}
         </View>
@@ -333,11 +371,11 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
           )}
 
           {/* Interests */}
-          {data.interests.length > 0 && (
+          {data.interests.filter(i => i.name.trim()).length > 0 && (
             <View style={styles.mainSection}>
               <Text style={styles.mainTitle}>{strings.interests}</Text>
               <View style={styles.tagsContainer}>
-                {data.interests.map(interest => (
+                {data.interests.filter(i => i.name.trim()).map(interest => (
                   <Text key={interest.id} style={styles.tag}>{interest.name}</Text>
                 ))}
               </View>
