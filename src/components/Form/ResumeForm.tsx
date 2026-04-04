@@ -173,6 +173,10 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
                     <label className="block text-xs font-medium text-gray-600 mb-1">{t.role}</label>
                     <input type="text" value={exp.role} onChange={(e) => updateArrayItem('experience', exp.id, {role: e.target.value})} className="w-full p-2 text-sm border border-gray-300 rounded focus:border-blue-500" />
                   </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">{t.location}</label>
+                    <input type="text" placeholder={data.language === 'fr' ? 'Ville, Pays' : 'City, Country'} value={exp.location || ''} onChange={(e) => updateArrayItem('experience', exp.id, {location: e.target.value})} className="w-full p-2 text-sm border border-gray-300 rounded focus:border-blue-500" />
+                  </div>
                   <div className="col-span-1">
                     <label className="block text-xs font-medium text-gray-600 mb-1">{t.startDate}</label>
                     <input type="text" placeholder="MM/YYYY" value={exp.startDate} onChange={(e) => updateArrayItem('experience', exp.id, {startDate: e.target.value})} className="w-full p-2 text-sm border border-gray-300 rounded focus:border-blue-500" />
@@ -199,7 +203,7 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
               </div>
             ))}
             <button 
-              onClick={() => addArrayItem('experience', { id: Date.now().toString(), company: '', role: '', startDate: '', endDate: '', current: false, description: '' })}
+              onClick={() => addArrayItem('experience', { id: Date.now().toString(), company: '', role: '', location: '', startDate: '', endDate: '', current: false, description: '' })}
               className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium"
             >
               <Plus size={16} className="mr-1" /> {t.addExperience}

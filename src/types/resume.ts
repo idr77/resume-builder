@@ -13,6 +13,7 @@ export interface Experience {
   id: string; // Unique identifier for mapping
   company: string;
   role: string;
+  location?: string;
   startDate: string;
   endDate: string;
   current: boolean;
@@ -70,6 +71,7 @@ export const initialResumeState: ResumeData = {
       id: "exp-1",
       company: 'Tech Solutions Inc.',
       role: 'Senior Full Stack Engineer',
+      location: 'San Francisco, CA',
       startDate: '2020',
       endDate: 'Present',
       current: true,

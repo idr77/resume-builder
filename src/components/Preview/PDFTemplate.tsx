@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     color: '#666666',
     lineHeight: 1.4,
     marginBottom: 25,
-    textAlign: 'justify'
+    textAlign: 'left'
   },
   
   mainSection: {
@@ -162,6 +162,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     lineHeight: 1.4,
     color: '#555555',
+    textAlign: 'left',
   }
 });
 
@@ -169,6 +170,22 @@ interface Props {
   data: ResumeData;
   template?: 'classic' | 'modern' | 'executive';
 }
+
+const renderStyledText = (text: string) => {
+  const parts = text.split(/(\*\*.*?\*\*|__.*?__|\*.*?\*|_.*?_)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <Text key={index} style={{ fontFamily: 'Helvetica-Bold' }}>{part.slice(2, -2)}</Text>;
+    }
+    if (part.startsWith('__') && part.endsWith('__')) {
+       return <Text key={index} style={{ textDecoration: 'underline' }}>{part.slice(2, -2)}</Text>;
+    }
+    if ((part.startsWith('*') && part.endsWith('*')) || (part.startsWith('_') && part.endsWith('_'))) {
+      return <Text key={index} style={{ fontFamily: 'Helvetica-Oblique' }}>{part.slice(1, -1)}</Text>;
+    }
+    return <React.Fragment key={index}>{part}</React.Fragment>;
+  });
+};
 
 export default function PDFTemplate({ data, template = 'classic' }: Props) {
   const strings = {
@@ -278,18 +295,38 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
                   <Text style={styles.expYear}>
                     {exp.startDate} {exp.endDate && exp.endDate !== exp.startDate ? `- ${exp.endDate}` : ''}
                   </Text>
-                  <Text style={styles.expCompanyRow}>{exp.company}</Text>
+                  <Text style={styles.expCompanyRow}>
+                    {exp.company}{exp.location ? ` - ${exp.location}` : ''}
+                  </Text>
                   <Text style={styles.expRole}>{exp.role}</Text>
                   
                   {/* Parse bullets from description */}
-                  {exp.description.split('\n').filter(Boolean).map((bullet, i) => (
-                    <View key={i} style={styles.expBulletRow}>
-                      <Text style={styles.expBulletDot}>•</Text>
-                      <Text style={styles.expBulletText}>
-                        {bullet.trim().replace(/^•\s*/, '')}
-                      </Text>
-                    </View>
-                  ))}
+                  {exp.description.split('\n').filter(line => line.trim().length > 0).map((bullet, i) => {
+                    const match = bullet.match(/^(\s*)([-*])\s*(.*)$/);
+                    let level = 0;
+                    let text = bullet.trim();
+                    let dot = '';
+                    
+                    if (match) {
+                      const spaces = match[1].length;
+                      level = Math.floor(spaces / 2); // 2 spaces per indentation level
+                      text = match[3];
+                      dot = level > 0 ? '-' : '•';
+                    } else if (text.match(/^[-*]\s*/)) {
+                       // Fallback if the regex somehow missed it but it starts with a bullet
+                       text = text.replace(/^[-*]\s*/, '');
+                       dot = '•';
+                    }
+
+                    return (
+                      <View key={i} style={[styles.expBulletRow, { paddingLeft: level * 10, marginTop: dot === '' ? 2 : 0 }]}>
+                        {dot && <Text style={styles.expBulletDot}>{dot}</Text>}
+                        <Text style={styles.expBulletText}>
+                          {renderStyledText(text)}
+                        </Text>
+                      </View>
+                    );
+                  })}
                 </View>
               ))}
             </View>
