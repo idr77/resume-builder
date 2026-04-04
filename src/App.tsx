@@ -18,6 +18,16 @@ function App() {
   const atsResult = useMemo(() => analyzeResumeMatch(resumeData), [resumeData]);
 
   const handleImport = (text: string) => {
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === 'object' && parsed.personalInfo) {
+        setResumeData({ ...resumeData, ...parsed, language: resumeData.language }); // Keep current language setting
+        return;
+      }
+    } catch (e) {
+      // Not JSON, fallback to existing naive heuristic
+    }
+
     // MVP Heuristic: Extract first line as Name, look for emails, and set rest as summary.
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
     if (!lines.length) return;
@@ -42,6 +52,19 @@ function App() {
       personalInfo: { ...resumeData.personalInfo, fullName, email },
       summary: summaryParts.join('\n') || resumeData.summary
     });
+  };
+
+  const handleExport = () => {
+    // Remove the targetJobDescription from export to keep it strictly resume content
+    const { targetJobDescription, ...exportData } = resumeData;
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `resume_data.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const t = getTranslation(resumeData.language).app;
@@ -80,12 +103,20 @@ function App() {
         <main className="flex-1 overflow-y-auto p-6 scroll-smooth bg-gray-50 border-r border-gray-200 shadow-inner">
           <div className="mb-4 flex justify-between items-center">
             <p className="text-gray-500 text-sm">{t.subtitle}</p>
-            <button 
-              onClick={() => setShowImportOpen(true)}
-              className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-full font-medium border border-indigo-200 hover:bg-indigo-100 transition"
-            >
-              {t.quickImport}
-            </button>
+            <div className="flex gap-2">
+              <button 
+                onClick={handleExport}
+                className="text-xs bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-full font-medium border border-emerald-200 hover:bg-emerald-100 transition"
+              >
+                {resumeData.language === 'fr' ? 'Exporter JSON' : 'Export JSON'}
+              </button>
+              <button 
+                onClick={() => setShowImportOpen(true)}
+                className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-full font-medium border border-indigo-200 hover:bg-indigo-100 transition"
+              >
+                {t.quickImport}
+              </button>
+            </div>
           </div>
           <ResumeForm data={resumeData} onChange={setResumeData} missingKeywords={atsResult.missingKeywords} />
         </main>
