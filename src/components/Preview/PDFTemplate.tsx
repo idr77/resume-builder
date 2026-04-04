@@ -9,15 +9,23 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica',
     fontSize: 10,
     backgroundColor: '#ffffff',
+    paddingTop: 35,
+    paddingBottom: 35,
+  },
+  pageBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: '35%',
+    backgroundColor: '#2b3643',
   },
   
   // Left Sidebar
   sidebar: {
     width: '35%',
-    backgroundColor: '#2b3643', // Dark slate derived from the model
     color: '#ffffff',
-    padding: 25,
-    paddingTop: 35,
+    paddingHorizontal: 25,
   },
   photoContainer: {
     alignItems: 'center',
@@ -87,9 +95,7 @@ const styles = StyleSheet.create({
   // Main Content
   main: {
     width: '65%',
-    padding: 30,
-    paddingTop: 35,
-    paddingRight: 35,
+    paddingHorizontal: 30,
     color: '#333333',
   },
   name: {
@@ -214,8 +220,8 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        
-        {/* === LEFT SIDEBAR === */}
+        <View style={styles.pageBackground} fixed />
+        {/* === SIDEBAR (LEFT) === */}
         <View style={styles.sidebar}>
           
           {/* Photo */}
@@ -265,20 +271,6 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
             )}
           </View>
 
-          {/* Formation (Education on the Left) */}
-          {data.education.length > 0 && (
-            <View style={styles.sidebarSection}>
-              <Text style={styles.sidebarTitle}>{strings.education}</Text>
-              {data.education.map(edu => (
-                <View key={edu.id} style={styles.sidebarTextContent}>
-                  <Text style={styles.sidebarText}>{edu.startDate} {edu.endDate && `- ${edu.endDate}`}</Text>
-                  <Text style={styles.sidebarLabel}>{edu.degree}</Text>
-                  <Text style={styles.sidebarText}>{edu.school}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
           {/* Skills */}
           {data.skills.filter(s => s.name.trim()).length > 0 && (
             <View style={styles.sidebarSection}>
@@ -308,6 +300,20 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
                   </View>
                 );
               })}
+            </View>
+          )}
+
+          {/* Formation (Education on the Left) */}
+          {data.education.length > 0 && (
+            <View style={styles.sidebarSection}>
+              <Text style={styles.sidebarTitle}>{strings.education}</Text>
+              {data.education.map(edu => (
+                <View key={edu.id} style={styles.sidebarTextContent}>
+                  <Text style={styles.sidebarText}>{edu.startDate} {edu.endDate && `- ${edu.endDate}`}</Text>
+                  <Text style={styles.sidebarLabel}>{edu.degree}</Text>
+                  <Text style={styles.sidebarText}>{edu.school}</Text>
+                </View>
+              ))}
             </View>
           )}
         </View>
@@ -340,7 +346,7 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
                   
                   {/* Parse bullets from description */}
                   {exp.description.split('\n').filter(line => line.trim().length > 0).map((bullet, i) => {
-                    const match = bullet.match(/^(\s*)([-*])\s*(.*)$/);
+                    const match = bullet.match(/^(\s*)([-*])\s+(.*)$/);
                     let level = 0;
                     let text = bullet.trim();
                     let dot = '';
@@ -350,9 +356,9 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
                       level = Math.floor(spaces / 2); // 2 spaces per indentation level
                       text = match[3];
                       dot = level > 0 ? '-' : '•';
-                    } else if (text.match(/^[-*]\s*/)) {
+                    } else if (text.match(/^[-*]\s+/)) {
                        // Fallback if the regex somehow missed it but it starts with a bullet
-                       text = text.replace(/^[-*]\s*/, '');
+                       text = text.replace(/^[-*]\s+/, '');
                        dot = '•';
                     }
 

@@ -9,6 +9,9 @@ export const translations = {
       livePreview: 'Live Preview',
       downloadPdf: 'Download PDF',
       generatingPdf: 'Generating PDF...',
+      translateResume: 'Translate to',
+      translating: 'Translating...',
+      translationError: 'Translation failed. Check your API key or try again.',
     },
     form: {
       personalInfo: 'Personal Information',
@@ -60,6 +63,9 @@ export const translations = {
       livePreview: 'Aperçu en direct',
       downloadPdf: 'Télécharger le PDF',
       generatingPdf: 'Génération en cours...',
+      translateResume: 'Traduire en',
+      translating: 'Traduction...',
+      translationError: 'La traduction a échoué. Vérifiez votre clé API.',
     },
     form: {
       personalInfo: 'Contact',

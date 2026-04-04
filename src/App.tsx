@@ -8,12 +8,14 @@ import { getTranslation } from './i18n/translations';
 import SettingsModal from './components/Form/SettingsModal';
 import OptimizationDashboard from './components/Preview/OptimizationDashboard';
 import { analyzeResumeMatch } from './utils/atsOptimizer';
-import { Settings } from 'lucide-react';
+import { translateResumeWithGemini } from './utils/geminiApiService';
+import { Settings, Languages, Loader2 } from 'lucide-react';
 
 function App() {
   const [resumeData, setResumeData] = useState<ResumeData>(initialResumeState);
   const [showImportOpen, setShowImportOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
 
   const atsResult = useMemo(() => analyzeResumeMatch(resumeData), [resumeData]);
 
@@ -68,6 +70,34 @@ function App() {
 
   const t = getTranslation(resumeData.language).app;
 
+  const handleTranslate = async (targetLang: 'en' | 'fr') => {
+    const apiKey = localStorage.getItem('gemini_api_key');
+    if (!apiKey) {
+      alert(t.translationError);
+      setShowSettings(true);
+      return;
+    }
+
+    setIsTranslating(true);
+    try {
+      const { targetJobDescription, ...dataToTranslate } = resumeData;
+      const translatedJson = await translateResumeWithGemini(apiKey, JSON.stringify(dataToTranslate), targetLang);
+      
+      const parsedData = JSON.parse(translatedJson);
+      
+      setResumeData({
+        ...resumeData,
+        ...parsedData,
+        targetJobDescription: resumeData.targetJobDescription,
+        language: targetLang,
+      });
+    } catch (e) {
+      alert(t.translationError);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50 font-sans overflow-hidden">
       {/* Sidebar / Form Area */}
@@ -75,6 +105,32 @@ function App() {
         <header className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-900 text-white shadow-md z-10">
           <h1 className="text-xl font-bold tracking-wide">{t.title}</h1>
           <div className="flex gap-3 items-center text-sm font-medium">
+            {isTranslating ? (
+              <span className="flex items-center text-yellow-400 bg-gray-800 px-3 py-1.5 rounded animate-pulse">
+                <Loader2 size={16} className="animate-spin mr-2" /> {t.translating}
+              </span>
+            ) : (
+              <div className="flex items-center gap-1 bg-gray-800 p-0.5 rounded mr-2">
+                <span className="text-gray-400 px-2 flex items-center text-xs uppercase" title={t.translateResume}>
+                  <Languages size={14} className="mr-1" /> {t.translateResume}:
+                </span>
+                <button 
+                  className="px-2 py-1 rounded text-xs transition-colors hover:bg-gray-700 text-gray-300"
+                  onClick={() => handleTranslate('en')}
+                >
+                  EN
+                </button>
+                <button 
+                  className="px-2 py-1 rounded text-xs transition-colors hover:bg-gray-700 text-gray-300"
+                  onClick={() => handleTranslate('fr')}
+                >
+                  FR
+                </button>
+              </div>
+            )}
+            
+            <div className="h-6 w-px bg-gray-700"></div>
+
             <button 
               onClick={() => setShowSettings(true)}
               className="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-300 hover:text-white"
