@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   },
   
   expItem: {
-    marginBottom: 14,
+    marginBottom: 24,
   },
   expYear: {
     fontSize: 10,
@@ -297,7 +297,7 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
                     }
 
                     return (
-                      <View key={i} style={[styles.expBulletRow, { paddingLeft: level * 10, marginTop: dot === '' ? 2 : 0, marginBottom: i === arr.length - 1 ? 0 : 2 }]}>
+                      <View key={i} style={[styles.expBulletRow, { paddingLeft: level * 10, marginTop: dot === '' ? (i > 0 ? 12 : 2) : 0, marginBottom: i === arr.length - 1 ? 0 : 2 }]}>
                         {dot && <Text style={styles.expBulletDot}>{dot}</Text>}
                         <Text style={styles.expBulletText}>
                           {renderStyledText(text)}
