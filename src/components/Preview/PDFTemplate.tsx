@@ -5,7 +5,7 @@ import type { ResumeData } from '../../types/resume';
 // Define the exact styling referencing the user's uploaded model
 const styles = StyleSheet.create({
   page: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse', // ATS Fix: renders right-to-left allowing Main to be placed right but read first!
     fontFamily: 'Helvetica',
     fontSize: 10,
     backgroundColor: '#ffffff',
@@ -26,10 +26,13 @@ const styles = StyleSheet.create({
     width: '35%',
     color: '#ffffff',
     paddingHorizontal: 25,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 20, // Automatically handles spacing between sections without creating trailing margins
   },
   photoContainer: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 10, // Was 30, reduced to 10 because gap gives another 20
   },
   photo: {
     width: 120,
@@ -40,7 +43,7 @@ const styles = StyleSheet.create({
     objectFit: 'cover',
   },
   sidebarSection: {
-    marginBottom: 20,
+    // marginBottom: 20, // Removed to avoid trailing margins, gap handles this dynamically
   },
   sidebarTitle: {
     fontSize: 16,
@@ -97,6 +100,9 @@ const styles = StyleSheet.create({
     width: '65%',
     paddingHorizontal: 30,
     color: '#333333',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 20, // Automatically handles spacing between sections without creating trailing margins
   },
   name: {
     fontSize: 32,
@@ -109,18 +115,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#555555',
     letterSpacing: 2,
-    marginBottom: 10,
+    // marginBottom: 10, managed inline dynamically
   },
   summary: {
     fontSize: 9,
     color: '#666666',
     lineHeight: 1.4,
-    marginBottom: 25,
+    // marginBottom: 25, managed inline dynamically to interact perfectly with gap
     textAlign: 'left'
   },
   
   mainSection: {
-    marginBottom: 20,
+    // marginBottom: 20, // Removed to avoid trailing margins, gap handles this dynamically
   },
   mainTitle: {
     fontSize: 18,
@@ -221,7 +227,80 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.pageBackground} fixed />
-        {/* === SIDEBAR (LEFT) === */}
+        
+        {/* === MAIN CONTENT (RIGHT SIDE VISUALLY, BUT RENDERED FIRST FOR ATS) === */}
+        <View style={styles.main}>
+          
+          {/* Header */}
+          <View>
+            <Text style={styles.name}>{data.personalInfo.fullName}</Text>
+            <Text style={[styles.jobTitleRow, { marginBottom: data.summary ? 10 : 0 }]}>{data.personalInfo.jobTitle}</Text>
+            {data.summary && (
+              <Text style={[styles.summary, { marginBottom: 5 }]}>{data.summary}</Text>
+            )}
+          </View>
+
+          {/* Experience */}
+          {data.experience.length > 0 && (
+            <View style={styles.mainSection}>
+              <Text style={styles.mainTitle}>{strings.experience}</Text>
+              {data.experience.map((exp, index) => (
+                <View key={exp.id} style={[styles.expItem, index === data.experience.length - 1 ? { marginBottom: 0 } : {}]}>
+                  <Text style={styles.expYear}>
+                    {exp.startDate} {exp.endDate && exp.endDate !== exp.startDate ? `- ${exp.endDate}` : ''}
+                  </Text>
+                  <Text style={styles.expCompanyRow}>
+                    {exp.company}{exp.location ? ` - ${exp.location}` : ''}
+                  </Text>
+                  <Text style={styles.expRole}>{exp.role}</Text>
+                  
+                  {/* Parse bullets from description */}
+                  {exp.description.split('\n').filter(line => line.trim().length > 0).map((bullet, i, arr) => {
+                    const match = bullet.match(/^(\s*)([-*])\s+(.*)$/);
+                    let level = 0;
+                    let text = bullet.trim();
+                    let dot = '';
+                    
+                    if (match) {
+                      const spaces = match[1].length;
+                      level = Math.floor(spaces / 2); // 2 spaces per indentation level
+                      text = match[3];
+                      dot = level > 0 ? '-' : '•';
+                    } else if (text.match(/^[-*]\s+/)) {
+                       // Fallback if the regex somehow missed it but it starts with a bullet
+                       text = text.replace(/^[-*]\s+/, '');
+                       dot = '•';
+                    }
+
+                    return (
+                      <View key={i} style={[styles.expBulletRow, { paddingLeft: level * 10, marginTop: dot === '' ? 2 : 0, marginBottom: i === arr.length - 1 ? 0 : 2 }]}>
+                        {dot && <Text style={styles.expBulletDot}>{dot}</Text>}
+                        <Text style={styles.expBulletText}>
+                          {renderStyledText(text)}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Interests */}
+          {data.interests.filter(i => i.name.trim()).length > 0 && (
+            <View style={styles.mainSection} wrap={false}>
+              <Text style={styles.mainTitle}>{strings.interests}</Text>
+              <View style={styles.tagsContainer}>
+                {data.interests.filter(i => i.name.trim()).map(interest => (
+                  <Text key={interest.id} style={styles.tag}>{interest.name}</Text>
+                ))}
+              </View>
+            </View>
+          )}
+
+        </View>
+
+        {/* === SIDEBAR (LEFT VISUALLY, BUT RENDERED SECOND FOR ATS) === */}
         <View style={styles.sidebar}>
           
           {/* Photo */}
@@ -232,7 +311,7 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
           )}
 
           {/* Contact */}
-          <View style={styles.sidebarSection}>
+          <View style={styles.sidebarSection} wrap={false}>
             <Text style={styles.sidebarTitle}>{strings.contact}</Text>
             
             {data.personalInfo.phone && (
@@ -264,7 +343,7 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
             )}
 
             {data.personalInfo.portfolio && (
-              <View style={styles.sidebarTextContent}>
+              <View style={[styles.sidebarTextContent, { marginBottom: 0 }]}>
                 <Text style={styles.sidebarLabel}>Portfolio</Text>
                 <Text style={styles.sidebarText}>{data.personalInfo.portfolio}</Text>
               </View>
@@ -273,7 +352,7 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
 
           {/* Skills */}
           {data.skills.filter(s => s.name.trim()).length > 0 && (
-            <View style={styles.sidebarSection}>
+            <View style={styles.sidebarSection} wrap={false}>
               <Text style={styles.sidebarTitle}>{strings.skills}</Text>
               <View style={styles.tagsContainer}>
                 {data.skills.filter(s => s.name.trim()).map(skill => (
@@ -285,12 +364,12 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
 
           {/* Languages */}
           {data.resumeLanguages.filter(l => l.name.trim()).length > 0 && (
-            <View style={styles.sidebarSection}>
+            <View style={styles.sidebarSection} wrap={false}>
               <Text style={styles.sidebarTitle}>{strings.languages}</Text>
-              {data.resumeLanguages.filter(l => l.name.trim()).map(lang => {
+              {data.resumeLanguages.filter(l => l.name.trim()).map((lang, index, arr) => {
                 const level = Math.max(1, Math.min(3, lang.level));
                 return (
-                  <View key={lang.id} style={{ marginBottom: 6 }}>
+                  <View key={lang.id} style={{ marginBottom: index === arr.length - 1 ? 0 : 6 }}>
                     <Text style={styles.sidebarLabel}>{lang.name}</Text>
                     <View style={{ flexDirection: 'row', marginTop: 3 }}>
                       <StarIcon filled={level >= 1} />
@@ -305,10 +384,10 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
 
           {/* Formation (Education on the Left) */}
           {data.education.length > 0 && (
-            <View style={styles.sidebarSection}>
+            <View style={styles.sidebarSection} wrap={false}>
               <Text style={styles.sidebarTitle}>{strings.education}</Text>
-              {data.education.map(edu => (
-                <View key={edu.id} style={styles.sidebarTextContent}>
+              {data.education.map((edu, index) => (
+                <View key={edu.id} style={[styles.sidebarTextContent, index === data.education.length - 1 ? { marginBottom: 0 } : {}]}>
                   <Text style={styles.sidebarText}>{edu.startDate} {edu.endDate && `- ${edu.endDate}`}</Text>
                   <Text style={styles.sidebarLabel}>{edu.degree}</Text>
                   <Text style={styles.sidebarText}>{edu.school}</Text>
@@ -316,78 +395,6 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
               ))}
             </View>
           )}
-        </View>
-
-
-        {/* === MAIN CONTENT (RIGHT SIDE) === */}
-        <View style={styles.main}>
-          
-          {/* Header */}
-          <Text style={styles.name}>{data.personalInfo.fullName}</Text>
-          <Text style={styles.jobTitleRow}>{data.personalInfo.jobTitle}</Text>
-          
-          {data.summary && (
-            <Text style={styles.summary}>{data.summary}</Text>
-          ) || <View style={{marginBottom: 20}} /> /* Spacer if no summary */}
-
-          {/* Experience */}
-          {data.experience.length > 0 && (
-            <View style={styles.mainSection}>
-              <Text style={styles.mainTitle}>{strings.experience}</Text>
-              {data.experience.map(exp => (
-                <View key={exp.id} style={styles.expItem}>
-                  <Text style={styles.expYear}>
-                    {exp.startDate} {exp.endDate && exp.endDate !== exp.startDate ? `- ${exp.endDate}` : ''}
-                  </Text>
-                  <Text style={styles.expCompanyRow}>
-                    {exp.company}{exp.location ? ` - ${exp.location}` : ''}
-                  </Text>
-                  <Text style={styles.expRole}>{exp.role}</Text>
-                  
-                  {/* Parse bullets from description */}
-                  {exp.description.split('\n').filter(line => line.trim().length > 0).map((bullet, i) => {
-                    const match = bullet.match(/^(\s*)([-*])\s+(.*)$/);
-                    let level = 0;
-                    let text = bullet.trim();
-                    let dot = '';
-                    
-                    if (match) {
-                      const spaces = match[1].length;
-                      level = Math.floor(spaces / 2); // 2 spaces per indentation level
-                      text = match[3];
-                      dot = level > 0 ? '-' : '•';
-                    } else if (text.match(/^[-*]\s+/)) {
-                       // Fallback if the regex somehow missed it but it starts with a bullet
-                       text = text.replace(/^[-*]\s+/, '');
-                       dot = '•';
-                    }
-
-                    return (
-                      <View key={i} style={[styles.expBulletRow, { paddingLeft: level * 10, marginTop: dot === '' ? 2 : 0 }]}>
-                        {dot && <Text style={styles.expBulletDot}>{dot}</Text>}
-                        <Text style={styles.expBulletText}>
-                          {renderStyledText(text)}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Interests */}
-          {data.interests.filter(i => i.name.trim()).length > 0 && (
-            <View style={styles.mainSection}>
-              <Text style={styles.mainTitle}>{strings.interests}</Text>
-              <View style={styles.tagsContainer}>
-                {data.interests.filter(i => i.name.trim()).map(interest => (
-                  <Text key={interest.id} style={styles.tag}>{interest.name}</Text>
-                ))}
-              </View>
-            </View>
-          )}
-
         </View>
       </Page>
     </Document>
