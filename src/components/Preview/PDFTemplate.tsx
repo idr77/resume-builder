@@ -1,6 +1,9 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Image, Svg, Path } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image, Svg, Path, Font, Link } from '@react-pdf/renderer';
 import type { ResumeData } from '../../types/resume';
+
+// Disable hyphenation to prevent unwanted word breaks in PDF rendering
+Font.registerHyphenationCallback((word) => [word]);
 
 // Define the exact styling referencing the user's uploaded model
 const styles = StyleSheet.create({
@@ -165,13 +168,13 @@ const styles = StyleSheet.create({
   },
   expBulletDot: {
     width: 12,
-    fontSize: 9,
+    fontSize: 8,
     color: '#666666',
     textAlign: 'center'
   },
   expBulletText: {
     flex: 1,
-    fontSize: 9,
+    fontSize: 8,
     lineHeight: 1.4,
     color: '#555555',
     textAlign: 'left',
@@ -193,6 +196,27 @@ const StarIcon = ({ filled }: { filled: boolean }) => (
     />
   </Svg>
 );
+
+const safelyBreakUrl = (url: string) => {
+  if (!url) return '';
+  if (url.length <= 24) return url;
+  
+  const mid = Math.floor(url.length / 2);
+  let breakIdx = url.indexOf('/', mid);
+  if (breakIdx === -1) breakIdx = url.indexOf('.', mid);
+  
+  if (breakIdx !== -1) {
+    const splitAt = url[breakIdx] === '/' ? breakIdx + 1 : breakIdx;
+    return url.slice(0, splitAt) + '\n' + url.slice(splitAt);
+  }
+  
+  return url.slice(0, mid + 5) + '\n' + url.slice(mid + 5);
+};
+
+const formatUrl = (url: string) => {
+  if (!url) return '';
+  return url.startsWith('http') ? url : `https://${url}`;
+};
 
 const renderStyledText = (text: string) => {
   const parts = text.split(/(\*\*.*?\*\*|__.*?__|\*.*?\*|_.*?_)/g);
@@ -338,14 +362,22 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
             {data.personalInfo.linkedin && (
               <View style={styles.sidebarTextContent}>
                 <Text style={styles.sidebarLabel}>LinkedIn</Text>
-                <Text style={styles.sidebarText}>{data.personalInfo.linkedin}</Text>
+                <Text style={styles.sidebarText}>
+                  <Link src={formatUrl(data.personalInfo.linkedin)} style={{ textDecoration: 'none', color: '#ffffff' }}>
+                    {safelyBreakUrl(data.personalInfo.linkedin)}
+                  </Link>
+                </Text>
               </View>
             )}
 
             {data.personalInfo.portfolio && (
               <View style={[styles.sidebarTextContent, { marginBottom: 0 }]}>
                 <Text style={styles.sidebarLabel}>Portfolio</Text>
-                <Text style={styles.sidebarText}>{data.personalInfo.portfolio}</Text>
+                <Text style={styles.sidebarText}>
+                  <Link src={formatUrl(data.personalInfo.portfolio)} style={{ textDecoration: 'none', color: '#ffffff' }}>
+                    {safelyBreakUrl(data.personalInfo.portfolio)}
+                  </Link>
+                </Text>
               </View>
             )}
           </View>
