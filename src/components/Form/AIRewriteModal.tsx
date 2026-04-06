@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Language } from '../../types/resume';
-import { rewriteExperienceWithGemini } from '../../utils/geminiApiService';
+import { rewriteExperienceWithGemini, rewriteSkillsWithGemini } from '../../utils/geminiApiService';
 
 interface Props {
   isOpen: boolean;
@@ -9,9 +9,10 @@ interface Props {
   missingKeywords: string[];
   language: Language;
   onApply: (newText: string) => void;
+  mode?: 'experience' | 'skills';
 }
 
-export default function AIRewriteModal({ isOpen, onClose, originalText, missingKeywords, language, onApply }: Props) {
+export default function AIRewriteModal({ isOpen, onClose, originalText, missingKeywords, language, onApply, mode = 'experience' }: Props) {
   const [tone, setTone] = useState<string>('Professional');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -26,7 +27,12 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
       const apiKey = localStorage.getItem('gemini_api_key');
       if (!apiKey) throw new Error('Missing Gemini API Key. Please add it in Settings.');
       
-      const newText = await rewriteExperienceWithGemini(apiKey, originalText, missingKeywords, tone, language);
+      let newText = '';
+      if (mode === 'skills') {
+        newText = await rewriteSkillsWithGemini(apiKey, originalText, missingKeywords, language);
+      } else {
+        newText = await rewriteExperienceWithGemini(apiKey, originalText, missingKeywords, tone, language);
+      }
       setProposedText(newText);
     } catch (err: any) {
       setError(err.message || 'An error occurred.');
@@ -62,22 +68,24 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
            </div>
 
            {/* Tone */}
-           <div className="mb-6">
-             <label className="block text-sm font-medium text-gray-700 mb-2">
-               {isFrench ? 'Sélectionner le ton' : 'Select Tone'}
-             </label>
-             <div className="flex gap-2">
-               {['Professional', 'Dynamic', 'Executive'].map(t => (
-                 <button 
-                  key={t}
-                  onClick={() => setTone(t)}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${tone === t ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
-                 >
-                   {t}
-                 </button>
-               ))}
+           {mode === 'experience' && (
+             <div className="mb-6">
+               <label className="block text-sm font-medium text-gray-700 mb-2">
+                 {isFrench ? 'Sélectionner le ton' : 'Select Tone'}
+               </label>
+               <div className="flex gap-2">
+                 {['Professional', 'Dynamic', 'Executive'].map(t => (
+                   <button 
+                    key={t}
+                    onClick={() => setTone(t)}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${tone === t ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+                   >
+                     {t}
+                   </button>
+                 ))}
+               </div>
              </div>
-           </div>
+           )}
 
            {/* Original vs Proposed */}
            <div className="grid grid-cols-2 gap-6">

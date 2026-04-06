@@ -30,11 +30,79 @@ Constraints:
 2. Use impactful action verbs (e.g., Managed, Developed, Accelerated).
 3. Maintain the exact original meaning and facts (do not invent metrics).
 4. STRICT: Do NOT add any invisible text, fake labels, or "hack" phrases. The output must be 100% human-readable and professional.
-5. Length: Keep it concise and format the output strictly as bullet points starting with a bullet (•). Do NOT add introductory phrases like "Here is your rewrite". Just output the bullet points.
-6. ${langInstruction}
+5. Length: Keep it concise and format the output strictly as a Markdown bullet list using dashes (-). Do NOT use bullet points (•) or dot points. Do NOT add introductory phrases like "Here is your rewrite". Just output the bullet points.
+6. IMPORTANT: If the original text contains titles in bold before bullet lists (e.g. **Title:**), keep these titles exactly unmodified and positioned before the bullet lists they introduce.
+7. ${langInstruction}
 
 Original Text:
 ${originalText}
+  `;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || 'Failed to generate content from Gemini API');
+    }
+
+    const data = await response.json();
+    const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    return generatedText.trim();
+  } catch (error: any) {
+    console.error("Gemini API Error:", error);
+    throw error;
+  }
+};
+
+export const rewriteSkillsWithGemini = async (
+  apiKey: string,
+  originalSkills: string,
+  missingKeywords: string[],
+  language: 'en' | 'fr'
+): Promise<string> => {
+  if (!apiKey) {
+    throw new Error('Gemini API Key is missing. Please add it in settings.');
+  }
+
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+  const langInstruction = language === 'fr' 
+    ? 'Write the response entirely in French.' 
+    : 'Write the response entirely in English.';
+
+  const keywordsInstruction = missingKeywords.length > 0 
+    ? missingKeywords.join(', ') 
+    : 'None';
+
+  const prompt = `
+Role: You are an expert recruitment consultant.
+Task: Improve and consolidate the following list of professional skills.
+
+Constraints:
+1. Incorporate the following missing keywords naturally into the list if they are relevant skills: [${keywordsInstruction}].
+2. Format the output STRICTLY as a single comma-separated list of skills. Do not add any bullet points, categories, or introductory phrases.
+3. Remove redundancies and use professional terminology.
+4. ${langInstruction}
+
+Original Skills:
+${originalSkills}
   `;
 
   try {

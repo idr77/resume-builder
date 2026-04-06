@@ -13,6 +13,7 @@ interface Props {
 export default function ResumeForm({ data, onChange, missingKeywords = [] }: Props) {
   const [openSection, setOpenSection] = useState<string | null>('personal');
   const [rewriteIndex, setRewriteIndex] = useState<string | null>(null);
+  const [rewriteSkillsOpen, setRewriteSkillsOpen] = useState(false);
 
   const toggleSection = (section: string) => {
     setOpenSection(openSection === section ? null : section);
@@ -43,18 +44,18 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
     onChange({ ...data, [field]: value });
   };
 
-  // Generic helpers for arrays (Experience, Education)
-  const addArrayItem = (field: 'experience' | 'education', newItem: any) => {
-    onChange({ ...data, [field]: [...data[field], newItem] });
+  // Generic helpers for arrays (Experience, Education, resumeLanguages)
+  const addArrayItem = (field: 'experience' | 'education' | 'resumeLanguages', newItem: any) => {
+    onChange({ ...data, [field]: [...data[field], newItem] as any });
   };
 
-  const updateArrayItem = (field: 'experience' | 'education', id: string, updatedFields: any) => {
+  const updateArrayItem = (field: 'experience' | 'education' | 'resumeLanguages', id: string, updatedFields: any) => {
     const newData = data[field].map((item: any) => item.id === id ? { ...item, ...updatedFields } : item);
-    onChange({ ...data, [field]: newData });
+    onChange({ ...data, [field]: newData as any });
   };
 
-  const removeArrayItem = (field: 'experience' | 'education', id: string) => {
-    onChange({ ...data, [field]: data[field].filter((item: any) => item.id !== id) });
+  const removeArrayItem = (field: 'experience' | 'education' | 'resumeLanguages', id: string) => {
+    onChange({ ...data, [field]: data[field].filter((item: any) => item.id !== id) as any });
   };
 
   const t = getTranslation(data.language).form;
@@ -288,6 +289,12 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
                 rows={2}
                 placeholder={t.skillsPlaceholder}
               />
+              <button
+                onClick={() => setRewriteSkillsOpen(true)}
+                className="mt-2 flex items-center gap-1 text-[10px] font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded transition w-max"
+              >
+                <Sparkles size={12} /> {data.language === 'fr' ? 'Optimiser avec IA' : 'Optimize with AI'}
+              </button>
             </div>
 
             <div className="mb-6">
@@ -343,10 +350,24 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
         originalText={rewriteIndex ? data.experience.find(e => e.id === rewriteIndex)?.description || '' : ''}
         missingKeywords={missingKeywords}
         language={data.language}
+        mode="experience"
         onApply={(newText) => {
           if (rewriteIndex) {
             updateArrayItem('experience', rewriteIndex, { description: newText });
           }
+        }}
+      />
+
+      <AIRewriteModal 
+        isOpen={rewriteSkillsOpen}
+        onClose={() => setRewriteSkillsOpen(false)}
+        originalText={data.skills.map(s => s.name).join(', ')}
+        missingKeywords={missingKeywords}
+        language={data.language}
+        mode="skills"
+        onApply={(newText) => {
+          const items = newText.split(',');
+          handleFieldChange('skills', items.map((name, i) => ({ id: `sk-${i}`, name: name.trim() })));
         }}
       />
     </div>
