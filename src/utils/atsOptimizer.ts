@@ -34,9 +34,11 @@ export const extractJDKeywords = (jdText: string): string[] => {
   return Array.from(keywordsFound);
 };
 
-export const analyzeResumeMatch = (resumeData: ResumeData): OptimizationResult => {
+export const analyzeResumeMatch = (resumeData: ResumeData, extraKeywords: string[] = []): OptimizationResult => {
   const jdText = resumeData.targetJobDescription || '';
-  const targetKeywords = extractJDKeywords(jdText);
+  const baseTargetKeywords = extractJDKeywords(jdText);
+  // Merge and deduplicate
+  const targetKeywords = Array.from(new Set([...baseTargetKeywords, ...extraKeywords]));
 
   if (targetKeywords.length === 0) {
     return { matchScore: 0, foundKeywords: [], missingKeywords: [], targetKeywords: [] };

@@ -16,8 +16,9 @@ function App() {
   const [showImportOpen, setShowImportOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [aiKeywords, setAiKeywords] = useState<string[]>([]); // New state for AI keywords
 
-  const atsResult = useMemo(() => analyzeResumeMatch(resumeData), [resumeData]);
+  const atsResult = useMemo(() => analyzeResumeMatch(resumeData, aiKeywords), [resumeData, aiKeywords]);
 
   const handleImport = (text: string) => {
     try {
@@ -98,6 +99,21 @@ function App() {
     }
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result;
+      if (typeof result === 'string') {
+        handleImport(result);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // Reset input to allow re-upload 
+  };
+
   return (
     <div className="flex h-screen bg-gray-50 font-sans overflow-hidden">
       {/* Sidebar / Form Area */}
@@ -159,6 +175,10 @@ function App() {
           <div className="mb-4 flex justify-between items-center">
             <p className="text-gray-500 text-sm">{t.subtitle}</p>
             <div className="flex gap-2">
+              <label className="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full font-medium border border-blue-200 hover:bg-blue-100 transition cursor-pointer">
+                {resumeData.language === 'fr' ? 'Importer JSON (.json)' : 'Import JSON (.json)'}
+                <input type="file" accept=".json" className="hidden" onChange={handleFileUpload} />
+              </label>
               <button 
                 onClick={handleExport}
                 className="text-xs bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-full font-medium border border-emerald-200 hover:bg-emerald-100 transition"
@@ -179,7 +199,7 @@ function App() {
 
       {/* Live Preview Area */}
       <div className="w-1/2 flex flex-col bg-gray-100">
-        <OptimizationDashboard data={resumeData} onChange={setResumeData} result={atsResult} />
+        <OptimizationDashboard data={resumeData} onChange={setResumeData} result={atsResult} setAiKeywords={setAiKeywords} />
 
         <header className="px-6 py-4 border-b border-gray-200 bg-white shadow-sm flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-700">{t.livePreview}</h2>

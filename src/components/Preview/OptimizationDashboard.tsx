@@ -1,30 +1,57 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { ResumeData } from '../../types/resume';
 import type { OptimizationResult } from '../../utils/atsOptimizer';
+import { extractKeywordsWithGemini } from '../../utils/geminiApiService';
 
 interface Props {
   data: ResumeData;
   onChange: (data: ResumeData) => void;
   result: OptimizationResult;
+  setAiKeywords: (keywords: string[]) => void;
 }
 
-export default function OptimizationDashboard({ data, onChange, result }: Props) {
+export default function OptimizationDashboard({ data, onChange, result, setAiKeywords }: Props) {
   const lang = data.language;
+  const [isExtracting, setIsExtracting] = useState(false);
+
+  const handleExtractKeywords = async () => {
+    try {
+      const apiKey = localStorage.getItem('gemini_api_key');
+      if (!apiKey) {
+        alert(lang === 'fr' ? "Clé API Gemini manquante. Allez dans les paramètres." : "Missing Gemini API Key. Go to Settings.");
+        return;
+      }
+      setIsExtracting(true);
+      const keywords = await extractKeywordsWithGemini(apiKey, data.targetJobDescription || '', lang);
+      setAiKeywords(keywords);
+    } catch (e) {
+      alert(lang === 'fr' ? "Échec de l'extraction." : "Extraction failed.");
+    } finally {
+      setIsExtracting(false);
+    }
+  };
 
   return (
     <div className="bg-white border-b border-gray-200">
       <div className="p-4 grid grid-cols-3 gap-4">
         {/* Left: Job Description Input */}
-        <div className="col-span-1 border-r border-gray-200 pr-4">
-          <label className="block text-xs font-semibold text-gray-600 mb-1">
+        <div className="col-span-1 border-r border-gray-200 pr-4 flex flex-col gap-2">
+          <label className="block text-xs font-semibold text-gray-600">
             {lang === 'fr' ? 'Description de poste (Cible)' : 'Target Job Description'}
           </label>
           <textarea
-            className="w-full h-24 p-2 text-xs border border-gray-300 rounded focus:border-blue-500"
+            className="w-full h-16 p-2 text-xs border border-gray-300 rounded focus:border-blue-500 resize-none"
             placeholder={lang === 'fr' ? "Collez l'annonce ici..." : "Paste job offer here..."}
             value={data.targetJobDescription || ''}
             onChange={(e) => onChange({ ...data, targetJobDescription: e.target.value })}
           />
+          <button 
+             disabled={isExtracting || !data.targetJobDescription}
+             onClick={handleExtractKeywords}
+             className="text-[10px] w-full py-1 text-center bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium rounded transition disabled:bg-gray-100 disabled:text-gray-400"
+          >
+            {isExtracting ? (lang === 'fr' ? 'Extraction...' : 'Extracting...') : (lang === 'fr' ? '✨ Extraire des mots-clés (IA)' : '✨ Extract Keywords (AI)')}
+          </button>
         </div>
         
         {/* Middle: Score & Breakdown */}

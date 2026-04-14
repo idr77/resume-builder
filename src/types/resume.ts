@@ -58,6 +58,7 @@ export interface ResumeData {
   resumeLanguages: ResumeLanguage[];
   interests: Interest[]; // Newly added
   targetJobDescription?: string; // Newly added for ATS Optimizer
+  coverLetter?: string; // Motivation letter text
 }
 
 export const initialResumeState: ResumeData = {

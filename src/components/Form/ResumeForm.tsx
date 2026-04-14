@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import type { ResumeData, Experience, Education, Skill, Interest } from '../../types/resume';
-import { ChevronDown, ChevronUp, Plus, Trash2, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, Sparkles, Loader2, FileText } from 'lucide-react';
 import { getTranslation } from '../../i18n/translations';
 import AIRewriteModal from './AIRewriteModal';
+import AIGlobalOptimizeModal from './AIGlobalOptimizeModal';
+import { generateSkillsFromExperienceWithGemini, generateCoverLetterWithGemini } from '../../utils/geminiApiService';
 
 interface Props {
   data: ResumeData;
@@ -14,6 +16,9 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
   const [openSection, setOpenSection] = useState<string | null>('personal');
   const [rewriteIndex, setRewriteIndex] = useState<string | null>(null);
   const [rewriteSkillsOpen, setRewriteSkillsOpen] = useState(false);
+  const [globalOptimizeOpen, setGlobalOptimizeOpen] = useState(false);
+  const [isGeneratingSkills, setIsGeneratingSkills] = useState(false);
+  const [isGeneratingCoverLetter, setIsGeneratingCoverLetter] = useState(false);
 
   const toggleSection = (section: string) => {
     setOpenSection(openSection === section ? null : section);
@@ -58,10 +63,59 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
     onChange({ ...data, [field]: data[field].filter((item: any) => item.id !== id) as any });
   };
 
+  const handleGenerateSkillsFromExperience = async () => {
+    try {
+      const apiKey = localStorage.getItem('gemini_api_key');
+      if (!apiKey) {
+        alert(data.language === 'fr' ? "Clé API Gemini manquante. Allez dans les paramètres." : "Missing Gemini API Key. Go to Settings.");
+        return;
+      }
+      setIsGeneratingSkills(true);
+      const newSkillsText = await generateSkillsFromExperienceWithGemini(apiKey, data.experience, data.language);
+      if (newSkillsText) {
+         const newNames = newSkillsText.split(',').map(s => s.trim()).filter(Boolean);
+         const currentNames = data.skills.map(s => s.name);
+         const combined = Array.from(new Set([...currentNames, ...newNames]));
+         handleFieldChange('skills', combined.map((name, i) => ({ id: `sk-${i}`, name })));
+      }
+    } catch (e) {
+      alert(data.language === 'fr' ? "Erreur lors de la génération." : "Error generating skills.");
+    } finally {
+      setIsGeneratingSkills(false);
+    }
+  };
+
+  const handleGenerateCoverLetter = async () => {
+    try {
+      const apiKey = localStorage.getItem('gemini_api_key');
+      if (!apiKey) {
+        alert(data.language === 'fr' ? "Clé API Gemini manquante. Allez dans les paramètres." : "Missing Gemini API Key. Go to Settings.");
+        return;
+      }
+      setIsGeneratingCoverLetter(true);
+      
+      const { coverLetter, ...resumeJsonPayload } = data;
+      const letter = await generateCoverLetterWithGemini(apiKey, JSON.stringify(resumeJsonPayload), data.targetJobDescription || '', data.language);
+      handleFieldChange('coverLetter', letter);
+      setOpenSection('coverLetter');
+    } catch (e) {
+      alert(data.language === 'fr' ? "Erreur." : "Error generating cover letter.");
+    } finally {
+      setIsGeneratingCoverLetter(false);
+    }
+  };
+
   const t = getTranslation(data.language).form;
 
   return (
     <div className="space-y-4">
+      <button 
+        onClick={() => setGlobalOptimizeOpen(true)}
+        className="w-full flex justify-center items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg font-medium shadow-sm transition"
+      >
+        <Sparkles size={18} /> {data.language === 'fr' ? 'Optimisation Globale avec IA' : 'Global AI Optimization'}
+      </button>
+
       {/* PERSONAL INFO SECTION */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <button 
@@ -289,12 +343,22 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
                 rows={2}
                 placeholder={t.skillsPlaceholder}
               />
-              <button
-                onClick={() => setRewriteSkillsOpen(true)}
-                className="mt-2 flex items-center gap-1 text-[10px] font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded transition w-max"
-              >
-                <Sparkles size={12} /> {data.language === 'fr' ? 'Optimiser avec IA' : 'Optimize with AI'}
-              </button>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <button
+                  onClick={() => setRewriteSkillsOpen(true)}
+                  className="flex items-center gap-1 text-[10px] font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded transition w-max"
+                >
+                  <Sparkles size={12} /> {data.language === 'fr' ? 'Optimiser avec IA' : 'Optimize with AI'}
+                </button>
+                <button
+                  onClick={handleGenerateSkillsFromExperience}
+                  disabled={isGeneratingSkills || data.experience.length === 0}
+                  className="flex items-center gap-1 text-[10px] font-medium text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded transition w-max disabled:opacity-50"
+                >
+                  {isGeneratingSkills ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                  {data.language === 'fr' ? 'Générer depuis les expériences' : 'Generate from Experience'}
+                </button>
+              </div>
             </div>
 
             <div className="mb-6">
@@ -343,6 +407,48 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
           </div>
         )}
       </div>
+
+      {/* COVER LETTER SECTION */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <button 
+          className="w-full flex items-center justify-between p-4 font-semibold text-gray-700 hover:bg-gray-50 transition"
+          onClick={() => toggleSection('coverLetter')}
+        >
+          <div className="flex items-center gap-2">
+            <FileText size={18} className="text-gray-500" />
+            <span>{data.language === 'fr' ? 'Lettre de Motivation' : 'Cover Letter'}</span>
+          </div>
+          {openSection === 'coverLetter' ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </button>
+        {openSection === 'coverLetter' && (
+          <div className="p-4 border-t border-gray-200">
+             <div className="mb-3 flex justify-end">
+               <button
+                  onClick={handleGenerateCoverLetter}
+                  disabled={isGeneratingCoverLetter}
+                  className="flex items-center gap-2 text-xs bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-full font-medium hover:bg-indigo-100 transition disabled:opacity-50"
+               >
+                 {isGeneratingCoverLetter ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                 {data.language === 'fr' ? 'Générer avec IA' : 'Generate with AI'}
+               </button>
+             </div>
+             <textarea 
+               value={data.coverLetter || ''} 
+               onChange={(e) => handleFieldChange('coverLetter', e.target.value)} 
+               rows={15}
+               className="w-full p-3 border border-gray-300 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition font-sans text-sm resize-none"
+               placeholder={data.language === 'fr' ? "Votre lettre de motivation apparaîtra ici..." : "Your cover letter will appear here..."}
+             />
+          </div>
+        )}
+      </div>
+
+      <AIGlobalOptimizeModal
+        isOpen={globalOptimizeOpen}
+        onClose={() => setGlobalOptimizeOpen(false)}
+        data={data}
+        onApply={(newData) => onChange({ ...data, ...newData })}
+      />
 
       <AIRewriteModal 
         isOpen={!!rewriteIndex}
