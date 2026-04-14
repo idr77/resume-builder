@@ -267,9 +267,9 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
           {/* Experience */}
           {data.experience.length > 0 && (
             <View style={styles.mainSection}>
-              <Text style={styles.mainTitle}>{strings.experience}</Text>
               {data.experience.map((exp, index) => (
-                <View key={exp.id} style={[styles.expItem, index === data.experience.length - 1 ? { marginBottom: 0 } : {}]}>
+                <View key={exp.id} wrap={index === 0 ? false : true} style={[styles.expItem, index === data.experience.length - 1 ? { marginBottom: 0 } : {}]}>
+                  {index === 0 && <Text style={styles.mainTitle}>{strings.experience}</Text>}
                   <Text style={styles.expYear}>
                     {exp.startDate} {exp.endDate && exp.endDate !== exp.startDate ? `- ${exp.endDate}` : ''}
                   </Text>
@@ -312,13 +312,22 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
 
           {/* Interests */}
           {data.interests.filter(i => i.name.trim()).length > 0 && (
-            <View style={styles.mainSection} wrap={false}>
-              <Text style={styles.mainTitle}>{strings.interests}</Text>
-              <View style={styles.tagsContainer}>
-                {data.interests.filter(i => i.name.trim()).map(interest => (
-                  <Text key={interest.id} style={styles.tag}>{interest.name}</Text>
-                ))}
+            <View style={styles.mainSection}>
+              <View wrap={false}>
+                <Text style={styles.mainTitle}>{strings.interests}</Text>
+                <View style={styles.tagsContainer}>
+                  {data.interests.filter(i => i.name.trim()).slice(0, 10).map(interest => (
+                    <Text key={interest.id} style={styles.tag}>{interest.name}</Text>
+                  ))}
+                </View>
               </View>
+              {data.interests.filter(i => i.name.trim()).length > 10 && (
+                <View style={[styles.tagsContainer, { marginTop: 6 }]}>
+                  {data.interests.filter(i => i.name.trim()).slice(10).map(interest => (
+                    <Text key={interest.id} style={styles.tag}>{interest.name}</Text>
+                  ))}
+                </View>
+              )}
             </View>
           )}
 
@@ -384,13 +393,22 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
 
           {/* Skills */}
           {data.skills.filter(s => s.name.trim()).length > 0 && (
-            <View style={styles.sidebarSection} wrap={false}>
-              <Text style={styles.sidebarTitle}>{strings.skills}</Text>
-              <View style={styles.tagsContainer}>
-                {data.skills.filter(s => s.name.trim()).map(skill => (
-                  <Text key={skill.id} style={styles.tag}>{skill.name}</Text>
-                ))}
+            <View style={styles.sidebarSection}>
+              <View wrap={false}>
+                <Text style={styles.sidebarTitle}>{strings.skills}</Text>
+                <View style={styles.tagsContainer}>
+                  {data.skills.filter(s => s.name.trim()).slice(0, 10).map(skill => (
+                    <Text key={skill.id} style={styles.tag}>{skill.name}</Text>
+                  ))}
+                </View>
               </View>
+              {data.skills.filter(s => s.name.trim()).length > 10 && (
+                <View style={[styles.tagsContainer, { marginTop: 6 }]}>
+                  {data.skills.filter(s => s.name.trim()).slice(10).map(skill => (
+                    <Text key={skill.id} style={styles.tag}>{skill.name}</Text>
+                  ))}
+                </View>
+              )}
             </View>
           )}
 
@@ -416,10 +434,10 @@ export default function PDFTemplate({ data, template = 'classic' }: Props) {
 
           {/* Formation (Education on the Left) */}
           {data.education.length > 0 && (
-            <View style={styles.sidebarSection} wrap={false}>
-              <Text style={styles.sidebarTitle}>{strings.education}</Text>
+            <View style={styles.sidebarSection}>
               {data.education.map((edu, index) => (
-                <View key={edu.id} style={[styles.sidebarTextContent, index === data.education.length - 1 ? { marginBottom: 0 } : {}]}>
+                <View key={edu.id} wrap={false} style={[styles.sidebarTextContent, index === data.education.length - 1 ? { marginBottom: 0 } : {}]}>
+                  {index === 0 && <Text style={styles.sidebarTitle}>{strings.education}</Text>}
                   <Text style={styles.sidebarText}>{edu.startDate} {edu.endDate && `- ${edu.endDate}`}</Text>
                   <Text style={styles.sidebarLabel}>{edu.degree}</Text>
                   <Text style={styles.sidebarText}>{edu.school}</Text>
