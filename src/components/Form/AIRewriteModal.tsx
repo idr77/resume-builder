@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { Language } from '../../types/resume';
 import { rewriteExperienceWithGemini, rewriteSkillsWithGemini } from '../../utils/geminiApiService';
 

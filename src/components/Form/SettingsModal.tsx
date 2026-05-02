@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getTranslation } from '../../i18n/translations';
 import type { Language } from '../../types/resume';
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { ResumeData } from '../../types/resume';
 import type { OptimizationResult } from '../../utils/atsOptimizer';
 import { extractKeywordsWithGemini } from '../../utils/geminiApiService';

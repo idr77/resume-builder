@@ -260,6 +260,7 @@ Task: Extract key skills, technical keywords, and soft skills from the following
 Constraints:
 1. ONLY return a raw JSON array of strings: ["keyword1", "keyword2"]. No markdown formatting, no comments.
 2. Extract the most important and representative terms. Keep phrases if they represent a single concept (e.g. "project management").
+3. Language: ${language === 'fr' ? 'French' : 'English'}.
 
 Job Description:
 ${jobDescription}

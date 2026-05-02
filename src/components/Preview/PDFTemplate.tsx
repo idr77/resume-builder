@@ -234,7 +234,7 @@ const renderStyledText = (text: string) => {
   });
 };
 
-export default function PDFTemplate({ data, template = 'classic' }: Props) {
+export default function PDFTemplate({ data }: Props) {
   const strings = {
     contact: data.language === 'fr' ? 'Contact' : 'Contact',
     phoneLabel: data.language === 'fr' ? 'Téléphone' : 'Phone',

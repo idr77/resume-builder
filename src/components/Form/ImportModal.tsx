@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import type { ResumeData, Language } from '../../types/resume';
+import { useState } from 'react';
+import type { Language } from '../../types/resume';
 import { getTranslation } from '../../i18n/translations';
 
 interface Props {

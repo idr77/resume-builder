@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import type { ResumeData, Experience, Education, Skill, Interest } from '../../types/resume';
+import { useState } from 'react';
+import type { ResumeData, Experience, Education } from '../../types/resume';
 import { ChevronDown, ChevronUp, Plus, Trash2, Sparkles, Loader2, FileText } from 'lucide-react';
 import { getTranslation } from '../../i18n/translations';
 import AIRewriteModal from './AIRewriteModal';
@@ -211,7 +211,7 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
         </button>
         {openSection === 'experience' && (
           <div className="p-4 border-t border-gray-200 space-y-6">
-            {data.experience.map((exp: Experience, index: number) => (
+            {data.experience.map((exp: Experience) => (
               <div key={exp.id} className="relative p-4 border border-gray-200 rounded-md bg-gray-50">
                 <button 
                   onClick={() => removeArrayItem('experience', exp.id)}
