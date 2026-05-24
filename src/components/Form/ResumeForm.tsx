@@ -6,6 +6,7 @@ import AIRewriteModal from './AIRewriteModal';
 import AIGlobalOptimizeModal from './AIGlobalOptimizeModal';
 import VersionManager from './VersionManager';
 import { generateSkillsFromExperienceWithGemini, generateCoverLetterWithGemini } from '../../utils/geminiApiService';
+import { compressImage } from '../../utils/imageCompressor';
 
 interface Props {
   data: ResumeData;
@@ -20,6 +21,7 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
   const [globalOptimizeOpen, setGlobalOptimizeOpen] = useState(false);
   const [isGeneratingSkills, setIsGeneratingSkills] = useState(false);
   const [isGeneratingCoverLetter, setIsGeneratingCoverLetter] = useState(false);
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
 
   const toggleSection = (section: string) => {
     setOpenSection(openSection === section ? null : section);
@@ -32,17 +34,30 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
     });
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
+      setIsCompressingPhoto(true);
+      try {
+        const compressed = await compressImage(file);
         onChange({
           ...data,
-          personalInfo: { ...data.personalInfo, photoUrl: reader.result as string }
+          personalInfo: { ...data.personalInfo, photoUrl: compressed }
         });
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('Error compressing image:', err);
+        // Fallback to simple read if compression fails
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          onChange({
+            ...data,
+            personalInfo: { ...data.personalInfo, photoUrl: reader.result as string }
+          });
+        };
+        reader.readAsDataURL(file);
+      } finally {
+        setIsCompressingPhoto(false);
+      }
     }
   };
 
@@ -159,13 +174,17 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
               <input type="text" name="portfolio" value={data.personalInfo.portfolio || ''} onChange={handlePersonalInfoChange} className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" />
             </div>
             <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{t.photoUpload}</label>
+              <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-2">
+                {t.photoUpload}
+                {isCompressingPhoto && <Loader2 size={14} className="animate-spin text-indigo-500" />}
+              </label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input 
                   type="file" 
                   accept="image/*"
                   onChange={handlePhotoUpload} 
-                  className="flex-1 text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/40 file:text-blue-700 dark:file:text-blue-400 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/50 cursor-pointer border border-gray-200 dark:border-gray-800 p-1 rounded" 
+                  disabled={isCompressingPhoto}
+                  className="flex-1 text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 dark:file:bg-blue-900/40 file:text-blue-700 dark:file:text-blue-400 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/50 cursor-pointer border border-gray-200 dark:border-gray-800 p-1 rounded disabled:opacity-50" 
                 />
                 <input 
                   type="text" 

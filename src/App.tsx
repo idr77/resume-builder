@@ -231,7 +231,16 @@ function App() {
                   if (stored) {
                     const parsed = JSON.parse(stored) as JobApplication[];
                     const next = parsed.map(app => app.id === updated.id ? updated : app);
-                    localStorage.setItem('ats_applications_tracker', JSON.stringify(next));
+                    try {
+                      localStorage.setItem('ats_applications_tracker', JSON.stringify(next));
+                    } catch (e: any) {
+                      console.error('Error updating application in localStorage:', e);
+                      if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
+                        alert(resumeData.language === 'fr'
+                          ? "Erreur : Mémoire locale saturée. Impossible d'enregistrer la candidature."
+                          : "Error: Local storage is full. Unable to save the application updates.");
+                      }
+                    }
                   }
                 }}
                 language={resumeData.language}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { ResumeData } from '../../types/resume';
 import { Save, FolderOpen, Copy, Trash2, Database, ChevronDown, ChevronUp } from 'lucide-react';
+import { compressImage } from '../../utils/imageCompressor';
 
 interface Props {
   data: ResumeData;
@@ -21,16 +22,39 @@ export default function VersionManager({ data, onLoad, language }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [message, setMessage] = useState('');
 
-  // Load versions from localStorage on mount
+  // Safe wrapper for localStorage.setItem to handle quota errors
+  const safeSetLocalStorage = (key: string, value: string): boolean => {
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch (e: any) {
+      if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
+        const errorMsg = language === 'fr'
+          ? "La mémoire locale est saturée (Quota de 5 Mo dépassé). Veuillez supprimer d'anciennes versions pour libérer de l'espace ou retirer votre photo de profil."
+          : "Local storage is full (5MB quota exceeded). Please delete older versions or compress your profile photo to free up space.";
+        alert(errorMsg);
+        setMessage(language === 'fr' ? "Erreur : Mémoire saturée !" : "Error: Storage full!");
+      } else {
+        console.error('LocalStorage write failed:', e);
+      }
+      return false;
+    }
+  };
+
+  // Load versions from localStorage on mount and run background photo migrations
   useEffect(() => {
     loadVersionsFromStorage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadVersionsFromStorage = () => {
     try {
       const stored = localStorage.getItem('ats_resumes_history');
       if (stored) {
-        setVersions(JSON.parse(stored));
+        const parsed = JSON.parse(stored) as SavedVersion[];
+        setVersions(parsed);
+        // Run migration in background to compress any huge legacy base64 photos
+        runBackgroundMigration(parsed);
       } else {
         // Create an initial version if empty
         const initial: SavedVersion = {
@@ -39,11 +63,48 @@ export default function VersionManager({ data, onLoad, language }: Props) {
           updatedAt: new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
           data: data
         };
-        localStorage.setItem('ats_resumes_history', JSON.stringify([initial]));
+        safeSetLocalStorage('ats_resumes_history', JSON.stringify([initial]));
         setVersions([initial]);
       }
     } catch (e) {
       console.error('Error loading versions', e);
+    }
+  };
+
+  const runBackgroundMigration = async (storedVersions: SavedVersion[]) => {
+    let hasChanges = false;
+    const migrated = await Promise.all(
+      storedVersions.map(async (v) => {
+        const photo = v.data?.personalInfo?.photoUrl;
+        // If version has a large Base64 photo string (> 70KB)
+        if (photo && photo.startsWith('data:image/') && photo.length > 70000) {
+          try {
+            console.log(`Migrating version "${v.name}" - compressing large profile photo...`);
+            const compressed = await compressImage(photo);
+            hasChanges = true;
+            return {
+              ...v,
+              data: {
+                ...v.data,
+                personalInfo: {
+                  ...v.data.personalInfo,
+                  photoUrl: compressed
+                }
+              }
+            };
+          } catch (err) {
+            console.error(`Failed to compress photo in version "${v.name}":`, err);
+            return v;
+          }
+        }
+        return v;
+      })
+    );
+
+    if (hasChanges) {
+      console.log('Background migration complete - saving compressed versions to localStorage');
+      safeSetLocalStorage('ats_resumes_history', JSON.stringify(migrated));
+      setVersions(migrated);
     }
   };
 
@@ -68,10 +129,11 @@ export default function VersionManager({ data, onLoad, language }: Props) {
     };
 
     const updated = [newVersion, ...versions.filter(v => v.name !== newVersion.name)];
-    localStorage.setItem('ats_resumes_history', JSON.stringify(updated));
-    setVersions(updated);
-    setNewVersionName('');
-    showNotification(language === 'fr' ? 'Version sauvegardée !' : 'Version saved successfully!');
+    if (safeSetLocalStorage('ats_resumes_history', JSON.stringify(updated))) {
+      setVersions(updated);
+      setNewVersionName('');
+      showNotification(language === 'fr' ? 'Version sauvegardée !' : 'Version saved successfully!');
+    }
   };
 
   const handleLoad = (version: SavedVersion) => {
@@ -87,9 +149,10 @@ export default function VersionManager({ data, onLoad, language }: Props) {
       data: version.data
     };
     const updated = [duplicated, ...versions];
-    localStorage.setItem('ats_resumes_history', JSON.stringify(updated));
-    setVersions(updated);
-    showNotification(language === 'fr' ? 'Version dupliquée !' : 'Version duplicated!');
+    if (safeSetLocalStorage('ats_resumes_history', JSON.stringify(updated))) {
+      setVersions(updated);
+      showNotification(language === 'fr' ? 'Version dupliquée !' : 'Version duplicated!');
+    }
   };
 
   const handleDelete = (id: string, name: string) => {
@@ -103,9 +166,10 @@ export default function VersionManager({ data, onLoad, language }: Props) {
     if (!window.confirm(confirmMsg)) return;
 
     const updated = versions.filter(v => v.id !== id);
-    localStorage.setItem('ats_resumes_history', JSON.stringify(updated));
-    setVersions(updated);
-    showNotification(language === 'fr' ? 'Version supprimée.' : 'Version deleted.');
+    if (safeSetLocalStorage('ats_resumes_history', JSON.stringify(updated))) {
+      setVersions(updated);
+      showNotification(language === 'fr' ? 'Version supprimée.' : 'Version deleted.');
+    }
   };
 
   const showNotification = (msg: string) => {

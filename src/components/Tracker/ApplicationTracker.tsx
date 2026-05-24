@@ -44,7 +44,16 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
   };
 
   const saveApplications = (updated: JobApplication[]) => {
-    localStorage.setItem('ats_applications_tracker', JSON.stringify(updated));
+    try {
+      localStorage.setItem('ats_applications_tracker', JSON.stringify(updated));
+    } catch (e: any) {
+      console.error('Error saving applications tracker', e);
+      if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
+        alert(language === 'fr' 
+          ? "Erreur : La mémoire locale est saturée. Veuillez libérer de l'espace en supprimant de vieilles versions de CV." 
+          : "Error: Local storage is full. Please free up space by deleting older CV versions.");
+      }
+    }
     setApplications(updated);
   };
 
