@@ -17,6 +17,7 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [proposedText, setProposedText] = useState('');
+  const [customDirectives, setCustomDirectives] = useState('');
 
   if (!isOpen) return null;
 
@@ -29,9 +30,9 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
       
       let newText = '';
       if (mode === 'skills') {
-        newText = await rewriteSkillsWithGemini(apiKey, originalText, missingKeywords, language);
+        newText = await rewriteSkillsWithGemini(apiKey, originalText, missingKeywords, language, customDirectives);
       } else {
-        newText = await rewriteExperienceWithGemini(apiKey, originalText, missingKeywords, tone, language);
+        newText = await rewriteExperienceWithGemini(apiKey, originalText, missingKeywords, tone, language, customDirectives);
       }
       setProposedText(newText);
     } catch (err: any) {
@@ -42,6 +43,19 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
   };
 
   const isFrench = language === 'fr';
+
+  // Quick directives presets based on mode
+  const presets = mode === 'experience' 
+    ? [
+        { label: isFrench ? '🎯 Résultats / KPI' : '🎯 Results / KPI', value: isFrench ? 'Insister sur les réalisations chiffrées et les résultats mesurables (KPIs).' : 'Emphasize measurable results and key performance metrics (KPIs).' },
+        { label: isFrench ? '🧩 Plus court' : '🧩 Shorter', value: isFrench ? 'Rendre la description extrêmement concise et percutante.' : 'Make the description extremely concise and punchy.' },
+        { label: isFrench ? '💻 Plus technique' : '💻 More technical', value: isFrench ? 'Mettre en avant les aspects techniques, l\'architecture et les technologies clés.' : 'Highlight technical architecture and core technologies.' },
+        { label: isFrench ? '🔄 Reconversion' : '🔄 Transferable skills', value: isFrench ? 'Mettre en avant les compétences transférables adaptées à un changement de poste.' : 'Highlight transferable skills adapted for a career transition.' }
+      ]
+    : [
+        { label: isFrench ? '💻 Hard Skills' : '💻 Hard Skills', value: isFrench ? 'Prioriser les compétences techniques dures.' : 'Prioritize core technical hard skills.' },
+        { label: isFrench ? '🧠 Soft Skills' : '🧠 Soft Skills', value: isFrench ? 'Inclure des compétences humaines (leadership, communication).' : 'Include interpersonal and soft skills (leadership, communication).' }
+      ];
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -55,22 +69,22 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
 
         <div className="p-6 flex-1 overflow-y-auto">
            {/* Context */}
-           <div className="mb-6 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-             <div className="text-sm font-semibold text-blue-800 mb-1">{isFrench ? 'Contexte' : 'Context'}</div>
-             <p className="text-xs text-blue-600 mb-2">
+           <div className="mb-4 p-3 bg-blue-50/50 border border-blue-100 rounded-lg">
+             <div className="text-xs font-semibold text-blue-800 mb-1">{isFrench ? 'Contexte' : 'Context'}</div>
+             <p className="text-[10px] text-blue-600 mb-1">
                {isFrench 
                  ? "L'IA tentera d'intégrer naturellement les mots-clés manquants suivants extraits de votre description de poste (s'ils sont pertinents) :" 
                  : "The AI will attempt to weave in the following missing keywords from your target Job Description naturally (if relevant):"}
              </p>
              <div className="flex flex-wrap gap-1">
-               {missingKeywords.length === 0 ? <span className="text-xs italic text-blue-500">None detected.</span> : missingKeywords.map(k => <span key={k} className="px-2 py-0.5 text-[10px] font-medium bg-white text-blue-700 border border-blue-200 rounded-full">{k}</span>)}
+               {missingKeywords.length === 0 ? <span className="text-[10px] italic text-blue-500">None detected.</span> : missingKeywords.map(k => <span key={k} className="px-2 py-0.5 text-[9px] font-medium bg-white text-blue-700 border border-blue-200 rounded-full">{k}</span>)}
              </div>
            </div>
 
            {/* Tone */}
            {mode === 'experience' && (
-             <div className="mb-6">
-               <label className="block text-sm font-medium text-gray-700 mb-2">
+             <div className="mb-4">
+               <label className="block text-xs font-semibold text-gray-600 mb-1.5">
                  {isFrench ? 'Sélectionner le ton' : 'Select Tone'}
                </label>
                <div className="flex gap-2">
@@ -78,7 +92,7 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
                    <button 
                     key={t}
                     onClick={() => setTone(t)}
-                    className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${tone === t ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+                    className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${tone === t ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
                    >
                      {t}
                    </button>
@@ -87,21 +101,54 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
              </div>
            )}
 
+           {/* Copilot Directives */}
+           <div className="mb-5">
+             <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+               {isFrench ? 'Copilote IA : Vos consignes particulières (Optionnel)' : 'AI Copilot: Your Custom Directives (Optional)'}
+             </label>
+             <input 
+               type="text"
+               value={customDirectives}
+               onChange={(e) => setCustomDirectives(e.target.value)}
+               placeholder={isFrench ? "Ex: Mettre en valeur la méthodologie agile et l'architecture cloud..." : "e.g. Highlight agile methodology and cloud architecture..."}
+               className="w-full p-2 text-xs border border-gray-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 mb-2 transition-all"
+             />
+             <div className="flex flex-wrap gap-1.5">
+               {presets.map(p => (
+                 <button
+                   key={p.label}
+                   onClick={() => setCustomDirectives(p.value)}
+                   className={`px-2 py-1 rounded text-[10px] font-medium border transition ${customDirectives === p.value ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-600'}`}
+                 >
+                   {p.label}
+                 </button>
+               ))}
+               {customDirectives && (
+                 <button 
+                   onClick={() => setCustomDirectives('')}
+                   className="px-2 py-1 rounded text-[10px] font-bold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                 >
+                   {isFrench ? 'Effacer' : 'Clear'}
+                 </button>
+               )}
+             </div>
+           </div>
+
            {/* Original vs Proposed */}
            <div className="grid grid-cols-2 gap-6">
              <div>
-               <h4 className="text-sm font-semibold text-gray-700 mb-2">{isFrench ? 'Texte original' : 'Original Text'}</h4>
+               <h4 className="text-xs font-semibold text-gray-600 mb-2">{isFrench ? 'Texte original' : 'Original Text'}</h4>
                <textarea 
                   value={originalText}
                   disabled
-                  className="w-full h-48 p-3 text-sm bg-gray-50 border border-gray-200 rounded text-gray-600 resize-none font-mono"
+                  className="w-full h-44 p-3 text-xs bg-gray-50 border border-gray-200 rounded text-gray-500 resize-none font-mono leading-relaxed"
                />
              </div>
              <div>
-               <h4 className="text-sm font-semibold text-blue-700 mb-2">{proposedText ? (isFrench?'Proposition IA':'AI Proposal') : (isFrench?'Prêt à réécrire':'Ready to Rewrite')}</h4>
+               <h4 className="text-xs font-semibold text-indigo-600 mb-2">{proposedText ? (isFrench?'Proposition IA':'AI Proposal') : (isFrench?'Prêt à réécrire':'Ready to Rewrite')}</h4>
                {loading ? (
-                 <div className="w-full h-48 flex items-center justify-center border border-blue-200 rounded bg-blue-50/50">
-                    <span className="text-sm font-medium text-blue-500 animate-pulse">
+                 <div className="w-full h-44 flex items-center justify-center border border-indigo-100 rounded bg-indigo-50/20">
+                    <span className="text-xs font-medium text-indigo-500 animate-pulse">
                       {isFrench ? 'Génération en cours...' : 'Generating...'}
                     </span>
                  </div>
@@ -109,8 +156,8 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
                  <textarea 
                     value={proposedText}
                     onChange={(e) => setProposedText(e.target.value)}
-                    className="w-full h-48 p-3 text-sm border border-blue-200 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-mono"
-                    placeholder={isFrench ? "Cliquez sur 'Générer' ci-dessous pour lancer l'IA." : "Click 'Generate Rewrite' below to query the AI."}
+                    className="w-full h-44 p-3 text-xs border border-indigo-200 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-mono leading-relaxed"
+                    placeholder={isFrench ? "Cliquez sur 'Générer la réécriture' ci-dessous pour lancer l'IA." : "Click 'Generate Rewrite' below to query the AI."}
                  />
                )}
              </div>

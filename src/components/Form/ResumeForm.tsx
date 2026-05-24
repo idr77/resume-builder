@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, Plus, Trash2, Sparkles, Loader2, FileText } fro
 import { getTranslation } from '../../i18n/translations';
 import AIRewriteModal from './AIRewriteModal';
 import AIGlobalOptimizeModal from './AIGlobalOptimizeModal';
+import VersionManager from './VersionManager';
 import { generateSkillsFromExperienceWithGemini, generateCoverLetterWithGemini } from '../../utils/geminiApiService';
 
 interface Props {
@@ -109,6 +110,8 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
 
   return (
     <div className="space-y-4">
+      <VersionManager data={data} onLoad={onChange} language={data.language} />
+
       <button 
         onClick={() => setGlobalOptimizeOpen(true)}
         className="w-full flex justify-center items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-lg font-medium shadow-sm transition"

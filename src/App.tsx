@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { initialResumeState, type ResumeData } from './types/resume';
 import ResumeForm from './components/Form/ResumeForm';
 import PDFTemplate from './components/Preview/PDFTemplate';
+import CoverLetterPDFTemplate from './components/Preview/CoverLetterPDFTemplate';
+import StyleControls from './components/Preview/StyleControls';
 import { PDFViewer, PDFDownloadLink } from '@react-pdf/renderer';
 import ImportModal from './components/Form/ImportModal';
 import { getTranslation } from './i18n/translations';
@@ -17,6 +19,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [aiKeywords, setAiKeywords] = useState<string[]>([]); // New state for AI keywords
+  const [previewTab, setPreviewTab] = useState<'cv' | 'cl'>('cv');
 
   const atsResult = useMemo(() => analyzeResumeMatch(resumeData, aiKeywords), [resumeData, aiKeywords]);
 
@@ -201,20 +204,57 @@ function App() {
       <div className="w-1/2 flex flex-col bg-gray-100">
         <OptimizationDashboard data={resumeData} onChange={setResumeData} result={atsResult} setAiKeywords={setAiKeywords} />
 
-        <header className="px-6 py-4 border-b border-gray-200 bg-white shadow-sm flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-700">{t.livePreview}</h2>
+        <header className="px-6 py-3.5 border-b border-gray-200 bg-white shadow-sm flex items-center justify-between">
+          <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
+            <button 
+              className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${previewTab === 'cv' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              onClick={() => setPreviewTab('cv')}
+            >
+              📄 {resumeData.language === 'fr' ? 'Mon CV' : 'My CV'}
+            </button>
+            <button 
+              className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${previewTab === 'cl' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              onClick={() => setPreviewTab('cl')}
+            >
+              ✉️ {resumeData.language === 'fr' ? 'Lettre de Motivation' : 'Cover Letter'}
+            </button>
+          </div>
+
           <PDFDownloadLink 
-            document={<PDFTemplate data={resumeData} template="classic" />} 
-            fileName={`${resumeData.personalInfo.fullName.replace(/\s+/g, '_')}_Resume.pdf`}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md shadow-sm font-medium transition-colors"
+            document={previewTab === 'cv' 
+              ? <PDFTemplate data={resumeData} template={resumeData.styleSettings?.template || 'classic'} /> 
+              : <CoverLetterPDFTemplate data={resumeData} />
+            } 
+            fileName={previewTab === 'cv' 
+              ? `${resumeData.personalInfo.fullName.replace(/\s+/g, '_')}_Resume.pdf`
+              : `${resumeData.personalInfo.fullName.replace(/\s+/g, '_')}_Cover_Letter.pdf`
+            }
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md shadow-sm text-xs font-semibold transition-colors"
           >
             {({ loading }) => (loading ? t.generatingPdf : t.downloadPdf)}
           </PDFDownloadLink>
         </header>
+
+        {previewTab === 'cv' && (
+          <StyleControls 
+            settings={resumeData.styleSettings || {
+              template: 'classic',
+              themeColor: 'slate',
+              fontFamily: 'Helvetica',
+              fontSize: 'medium'
+            }}
+            onChange={(newSettings) => setResumeData({ ...resumeData, styleSettings: newSettings })}
+            language={resumeData.language}
+          />
+        )}
         
         <main className="flex-1 overflow-hidden p-0 bg-gray-200 flex flex-col">
           <PDFViewer width="100%" height="100%" className="border-none flex-1">
-            <PDFTemplate data={resumeData} template="classic" />
+            {previewTab === 'cv' ? (
+              <PDFTemplate data={resumeData} template={resumeData.styleSettings?.template || 'classic'} />
+            ) : (
+              <CoverLetterPDFTemplate data={resumeData} />
+            )}
           </PDFViewer>
         </main>
       </div>

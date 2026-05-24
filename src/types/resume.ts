@@ -45,8 +45,14 @@ export interface ResumeLanguage {
   level: number; // 1 to 3
 }
 
-// Support multiple languages internally
 export type Language = 'en' | 'fr';
+
+export interface ResumeStyleSettings {
+  template: 'classic' | 'modern' | 'executive';
+  themeColor: 'slate' | 'navy' | 'emerald' | 'indigo' | 'burgundy';
+  fontFamily: 'Helvetica' | 'Times-Roman' | 'Courier';
+  fontSize: 'small' | 'medium' | 'large';
+}
 
 export interface ResumeData {
   language: Language;
@@ -59,6 +65,7 @@ export interface ResumeData {
   interests: Interest[]; // Newly added
   targetJobDescription?: string; // Newly added for ATS Optimizer
   coverLetter?: string; // Motivation letter text
+  styleSettings?: ResumeStyleSettings; // Newly added for templates
 }
 
 export const initialResumeState: ResumeData = {
@@ -109,5 +116,11 @@ export const initialResumeState: ResumeData = {
     { id: 'int-1', name: 'Open Source Software' },
     { id: 'int-2', name: 'Photography' }
   ],
-  targetJobDescription: ''
+  targetJobDescription: '',
+  styleSettings: {
+    template: 'classic',
+    themeColor: 'slate',
+    fontFamily: 'Helvetica',
+    fontSize: 'medium'
+  }
 };

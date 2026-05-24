@@ -3,7 +3,8 @@ export const rewriteExperienceWithGemini = async (
   originalText: string,
   missingKeywords: string[],
   tone: string,
-  language: 'en' | 'fr'
+  language: 'en' | 'fr',
+  customDirectives?: string
 ): Promise<string> => {
   if (!apiKey) {
     throw new Error('Gemini API Key is missing. Please add it in settings.');
@@ -20,6 +21,10 @@ export const rewriteExperienceWithGemini = async (
     ? missingKeywords.join(', ') 
     : 'None';
 
+  const directivesInstruction = customDirectives && customDirectives.trim()
+    ? `8. CRITICAL Directives: Adapt the content STRICTLY following these user instructions: "${customDirectives.trim()}". Maintain the exact tone, bullet points constraints, and facts while applying these custom requests.`
+    : '';
+
   const prompt = `
 Role: You are an expert recruitment consultant.
 Task: Rewrite the following professional experience bullet points.
@@ -33,6 +38,7 @@ Constraints:
 5. Length: Keep it concise and format the output strictly as a Markdown bullet list using dashes (-). Do NOT use bullet points (•) or dot points. Do NOT add introductory phrases like "Here is your rewrite". Just output the bullet points.
 6. IMPORTANT: If the original text contains titles in bold before bullet lists (e.g. **Title:**), keep these titles exactly unmodified and positioned before the bullet lists they introduce.
 7. ${langInstruction}
+${directivesInstruction}
 
 Original Text:
 ${originalText}
@@ -75,7 +81,8 @@ export const rewriteSkillsWithGemini = async (
   apiKey: string,
   originalSkills: string,
   missingKeywords: string[],
-  language: 'en' | 'fr'
+  language: 'en' | 'fr',
+  customDirectives?: string
 ): Promise<string> => {
   if (!apiKey) {
     throw new Error('Gemini API Key is missing. Please add it in settings.');
@@ -91,6 +98,10 @@ export const rewriteSkillsWithGemini = async (
     ? missingKeywords.join(', ') 
     : 'None';
 
+  const directivesInstruction = customDirectives && customDirectives.trim()
+    ? `5. CRITICAL Directives: Consolidate and select skills STRICTLY following these user instructions: "${customDirectives.trim()}". Maintain standard professional terms and comma-separated format.`
+    : '';
+
   const prompt = `
 Role: You are an expert recruitment consultant.
 Task: Improve and consolidate the following list of professional skills.
@@ -100,6 +111,7 @@ Constraints:
 2. Format the output STRICTLY as a single comma-separated list of skills. Do not add any bullet points, categories, or introductory phrases.
 3. Remove redundancies and use professional terminology.
 4. ${langInstruction}
+${directivesInstruction}
 
 Original Skills:
 ${originalSkills}
