@@ -26,18 +26,18 @@ export default function StyleControls({ settings, onChange, language }: Props) {
   };
 
   return (
-    <div className="bg-white border-b border-gray-200 px-6 py-2.5 flex flex-wrap items-center justify-between gap-4 shadow-sm z-10">
+    <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-850 px-6 py-2.5 flex flex-wrap items-center justify-between gap-4 shadow-sm z-10 transition-colors">
       
       {/* Template Select */}
       <div className="flex items-center gap-2">
-        <Layout size={14} className="text-gray-500" />
-        <span className="text-xs font-semibold text-gray-600">
+        <Layout size={14} className="text-gray-500 dark:text-gray-400" />
+        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
           {isFrench ? 'Modèle :' : 'Template:'}
         </span>
         <select 
           value={settings.template} 
           onChange={(e) => updateSetting('template', e.target.value as any)}
-          className="p-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 bg-white"
+          className="p-1 text-xs border border-gray-300 dark:border-gray-750 dark:bg-gray-800 dark:text-gray-200 rounded focus:ring-1 focus:ring-indigo-500 bg-white"
         >
           <option value="classic">{isFrench ? 'Classic (Actuel)' : 'Classic (Current)'}</option>
           <option value="modern">{isFrench ? 'Modern' : 'Modern'}</option>
@@ -47,8 +47,8 @@ export default function StyleControls({ settings, onChange, language }: Props) {
 
       {/* Accent Colors */}
       <div className="flex items-center gap-2">
-        <Palette size={14} className="text-gray-500" />
-        <span className="text-xs font-semibold text-gray-600">
+        <Palette size={14} className="text-gray-500 dark:text-gray-400" />
+        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
           {isFrench ? 'Couleur :' : 'Color:'}
         </span>
         <div className="flex items-center gap-1.5">
@@ -69,14 +69,14 @@ export default function StyleControls({ settings, onChange, language }: Props) {
 
       {/* Font Family */}
       <div className="flex items-center gap-2">
-        <Type size={14} className="text-gray-500" />
-        <span className="text-xs font-semibold text-gray-600">
+        <Type size={14} className="text-gray-500 dark:text-gray-400" />
+        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
           {isFrench ? 'Police :' : 'Font:'}
         </span>
         <select 
           value={settings.fontFamily} 
           onChange={(e) => updateSetting('fontFamily', e.target.value as any)}
-          className="p-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 bg-white"
+          className="p-1 text-xs border border-gray-300 dark:border-gray-750 dark:bg-gray-800 dark:text-gray-200 rounded focus:ring-1 focus:ring-indigo-500 bg-white"
         >
           <option value="Helvetica">Sans-Serif (Helvetica)</option>
           <option value="Times-Roman">Serif (Times-Roman)</option>
@@ -86,14 +86,14 @@ export default function StyleControls({ settings, onChange, language }: Props) {
 
       {/* Font Size */}
       <div className="flex items-center gap-2">
-        <Type size={14} className="text-gray-500" />
-        <span className="text-xs font-semibold text-gray-600">
+        <Type size={14} className="text-gray-500 dark:text-gray-400" />
+        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
           {isFrench ? 'Taille :' : 'Size:'}
         </span>
         <select 
           value={settings.fontSize} 
           onChange={(e) => updateSetting('fontSize', e.target.value as any)}
-          className="p-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 bg-white"
+          className="p-1 text-xs border border-gray-300 dark:border-gray-750 dark:bg-gray-800 dark:text-gray-200 rounded focus:ring-1 focus:ring-indigo-500 bg-white"
         >
           <option value="small">{isFrench ? 'Petit' : 'Small'}</option>
           <option value="medium">{isFrench ? 'Moyen' : 'Medium'}</option>

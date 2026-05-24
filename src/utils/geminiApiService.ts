@@ -389,3 +389,52 @@ export const generateCoverLetterWithGemini = async (
       throw error;
     }
   };
+
+export const generateInterviewPrepWithGemini = async (
+  apiKey: string,
+  resumeJson: string,
+  jobDescription: string,
+  stepTitle: string,
+  skillsDossierText?: string
+): Promise<string> => {
+  if (!apiKey) throw new Error('Gemini API Key is missing.');
+
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+  const dossierSection = skillsDossierText && skillsDossierText.trim()
+    ? `\nCandidate Master Background Document (Dossier de compétences) :\n${skillsDossierText.trim()}\n`
+    : '';
+
+  const prompt = `
+Role: You are an expert interview coach and career consultant.
+Task: Create a highly customized, rigorous, and practical Interview Preparation Guide for the candidate based on the provided data.
+Context:
+- The candidate is preparing for the specific interview step: "${stepTitle}".
+- Target Job Description: "${jobDescription || 'Not specified'}"
+- Candidate Resume (JSON): "${resumeJson}"
+${dossierSection}
+
+Constraints:
+1. Output format: Standard Markdown. Do not include markdown JSON blocks or introductory phrases like "Here is your guide". Start directly with the markdown content.
+2. The language of the guide must match the step title's language. If the title is in French ("Entretien Technique", "Fit"), write entirely in French. If in English, write entirely in English.
+3. Keep the content deeply aligned with the candidate's actual projects, technologies, and achievements mentioned in the resume and background documents. DO NOT invent details or projects.
+4. Structure the guide strictly into the following sections:
+   - ### 🎯 Objectifs de l'étape [Step Objectives]: Define the main focus of this step (HR, Technical, or Culture/Fit) and what the interviewer is evaluating.
+   - ### ❓ Top 5 Questions & Réponses sur-mesure [Top 5 Custom Questions & Answers]: Write 5 highly probable questions for this step. For each question, provide a detailed, tailored answer using the candidate's actual experience bullet points (under the STAR framework if behavioral, or precise architectures/technologies if technical).
+   - ### 💻 Sujets techniques & Méthodes à réviser [Topics to Review]: Focus on specific tech stacks (e.g. React, Node, System Design) or behavioral storytelling frameworks corresponding to this step.
+   - ### 💬 Questions intelligentes à poser [Smart Questions to Ask]: Provide 3 deep, non-obvious questions for the candidate to ask the interviewer.
+  `;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } })
+    });
+    if (!response.ok) throw new Error('Failed to generate interview prep from Gemini API');
+    return (await response.json()).candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+  } catch (error: any) {
+    console.error("Gemini Interview Prep Error:", error);
+    throw error;
+  }
+};

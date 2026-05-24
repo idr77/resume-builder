@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { initialResumeState, type ResumeData } from './types/resume';
 import ResumeForm from './components/Form/ResumeForm';
 import PDFTemplate from './components/Preview/PDFTemplate';
@@ -11,7 +11,10 @@ import SettingsModal from './components/Form/SettingsModal';
 import OptimizationDashboard from './components/Preview/OptimizationDashboard';
 import { analyzeResumeMatch } from './utils/atsOptimizer';
 import { translateResumeWithGemini } from './utils/geminiApiService';
-import { Settings, Languages, Loader2 } from 'lucide-react';
+import { Settings, Languages, Loader2, Sun, Moon, Briefcase, FileText as FileIcon } from 'lucide-react';
+import ApplicationTracker from './components/Tracker/ApplicationTracker';
+import ApplicationDetail from './components/Tracker/ApplicationDetail';
+import type { JobApplication } from './types/tracker';
 
 function App() {
   const [resumeData, setResumeData] = useState<ResumeData>(initialResumeState);
@@ -20,6 +23,20 @@ function App() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [aiKeywords, setAiKeywords] = useState<string[]>([]); // New state for AI keywords
   const [previewTab, setPreviewTab] = useState<'cv' | 'cl'>('cv');
+  const [appMode, setAppMode] = useState<'cv' | 'tracker'>('cv');
+  const [selectedApplication, setSelectedApplication] = useState<JobApplication | null>(null);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return (localStorage.getItem('app_theme') as 'light' | 'dark') || 'light';
+  });
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('app_theme', theme);
+  }, [theme]);
 
   const atsResult = useMemo(() => analyzeResumeMatch(resumeData, aiKeywords), [resumeData, aiKeywords]);
 
@@ -118,11 +135,31 @@ function App() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans overflow-hidden">
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-950 font-sans overflow-hidden transition-colors duration-200">
       {/* Sidebar / Form Area */}
-      <div className="w-1/2 flex flex-col border-r border-gray-200 bg-white">
-        <header className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-900 text-white shadow-md z-10">
-          <h1 className="text-xl font-bold tracking-wide">{t.title}</h1>
+      <div className="w-1/2 flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 transition-colors">
+        <header className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-900 text-white shadow-md z-10">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-bold tracking-wide hidden lg:block">{t.title}</h1>
+            <div className="flex bg-gray-800 p-0.5 rounded border border-gray-700">
+              <button 
+                onClick={() => setAppMode('cv')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors cursor-pointer font-medium ${appMode === 'cv' ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:text-white'}`}
+                title={resumeData.language === 'fr' ? 'Rédacteur de CV' : 'Resume Editor'}
+              >
+                <FileIcon size={12} />
+                <span className="hidden sm:inline">{resumeData.language === 'fr' ? 'CV & Lettre' : 'CV & Letter'}</span>
+              </button>
+              <button 
+                onClick={() => setAppMode('tracker')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors cursor-pointer font-medium ${appMode === 'tracker' ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:text-white'}`}
+                title={resumeData.language === 'fr' ? 'Suivi des candidatures' : 'Applications Tracker'}
+              >
+                <Briefcase size={12} />
+                <span className="hidden sm:inline">{resumeData.language === 'fr' ? 'Candidatures' : 'Tracker'}</span>
+              </button>
+            </div>
+          </div>
           <div className="flex gap-3 items-center text-sm font-medium">
             {isTranslating ? (
               <span className="flex items-center text-yellow-400 bg-gray-800 px-3 py-1.5 rounded animate-pulse">
@@ -151,6 +188,14 @@ function App() {
             <div className="h-6 w-px bg-gray-700"></div>
 
             <button 
+              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+              className="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-300 hover:text-white"
+              title={resumeData.language === 'fr' ? 'Changer de thème' : 'Switch Theme'}
+            >
+              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+
+            <button 
               onClick={() => setShowSettings(true)}
               className="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-300 hover:text-white"
               title="Settings"
@@ -174,46 +219,73 @@ function App() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6 scroll-smooth bg-gray-50 border-r border-gray-200 shadow-inner">
-          <div className="mb-4 flex justify-between items-center">
-            <p className="text-gray-500 text-sm">{t.subtitle}</p>
-            <div className="flex gap-2">
-              <label className="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full font-medium border border-blue-200 hover:bg-blue-100 transition cursor-pointer">
-                {resumeData.language === 'fr' ? 'Importer JSON (.json)' : 'Import JSON (.json)'}
-                <input type="file" accept=".json" className="hidden" onChange={handleFileUpload} />
-              </label>
-              <button 
-                onClick={handleExport}
-                className="text-xs bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-full font-medium border border-emerald-200 hover:bg-emerald-100 transition"
-              >
-                {resumeData.language === 'fr' ? 'Exporter JSON' : 'Export JSON'}
-              </button>
-              <button 
-                onClick={() => setShowImportOpen(true)}
-                className="text-xs bg-indigo-50 text-indigo-600 px-3 py-1.5 rounded-full font-medium border border-indigo-200 hover:bg-indigo-100 transition"
-              >
-                {t.quickImport}
-              </button>
-            </div>
-          </div>
-          <ResumeForm data={resumeData} onChange={setResumeData} missingKeywords={atsResult.missingKeywords} />
+        <main className="flex-1 overflow-y-auto p-6 scroll-smooth bg-gray-50 dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 shadow-inner">
+          {appMode === 'tracker' ? (
+            selectedApplication ? (
+              <ApplicationDetail 
+                application={selectedApplication} 
+                onBack={() => setSelectedApplication(null)}
+                onUpdate={(updated) => {
+                  setSelectedApplication(updated);
+                  const stored = localStorage.getItem('ats_applications_tracker');
+                  if (stored) {
+                    const parsed = JSON.parse(stored) as JobApplication[];
+                    const next = parsed.map(app => app.id === updated.id ? updated : app);
+                    localStorage.setItem('ats_applications_tracker', JSON.stringify(next));
+                  }
+                }}
+                language={resumeData.language}
+              />
+            ) : (
+              <ApplicationTracker 
+                activeResumeData={resumeData} 
+                onSelectApplication={setSelectedApplication} 
+                language={resumeData.language}
+              />
+            )
+          ) : (
+            <>
+              <div className="mb-4 flex justify-between items-center flex-wrap gap-2">
+                <p className="text-gray-500 text-sm dark:text-gray-400">{t.subtitle}</p>
+                <div className="flex gap-2">
+                  <label className="text-xs bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 px-3 py-1.5 rounded-full font-medium border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition cursor-pointer">
+                    {resumeData.language === 'fr' ? 'Importer JSON (.json)' : 'Import JSON (.json)'}
+                    <input type="file" accept=".json" className="hidden" onChange={handleFileUpload} />
+                  </label>
+                  <button 
+                    onClick={handleExport}
+                    className="text-xs bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300 px-3 py-1.5 rounded-full font-medium border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition cursor-pointer"
+                  >
+                    {resumeData.language === 'fr' ? 'Exporter JSON' : 'Export JSON'}
+                  </button>
+                  <button 
+                    onClick={() => setShowImportOpen(true)}
+                    className="text-xs bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 px-3 py-1.5 rounded-full font-medium border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition cursor-pointer"
+                  >
+                    {t.quickImport}
+                  </button>
+                </div>
+              </div>
+              <ResumeForm data={resumeData} onChange={setResumeData} missingKeywords={atsResult.missingKeywords} />
+            </>
+          )}
         </main>
       </div>
 
       {/* Live Preview Area */}
-      <div className="w-1/2 flex flex-col bg-gray-100">
+      <div className="w-1/2 flex flex-col bg-gray-100 dark:bg-gray-950 transition-colors">
         <OptimizationDashboard data={resumeData} onChange={setResumeData} result={atsResult} setAiKeywords={setAiKeywords} />
 
-        <header className="px-6 py-3.5 border-b border-gray-200 bg-white shadow-sm flex items-center justify-between">
-          <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
+        <header className="px-6 py-3.5 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm flex items-center justify-between transition-colors">
+          <div className="flex gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg transition-colors">
             <button 
-              className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${previewTab === 'cv' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${previewTab === 'cv' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}
               onClick={() => setPreviewTab('cv')}
             >
               📄 {resumeData.language === 'fr' ? 'Mon CV' : 'My CV'}
             </button>
             <button 
-              className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${previewTab === 'cl' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${previewTab === 'cl' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}
               onClick={() => setPreviewTab('cl')}
             >
               ✉️ {resumeData.language === 'fr' ? 'Lettre de Motivation' : 'Cover Letter'}
