@@ -107,12 +107,12 @@ export default function AIGlobalOptimizeModal({ isOpen, onClose, data, onApply }
               <textarea 
                 value={detailedDoc}
                 onChange={(e) => setDetailedDoc(e.target.value)}
-                className="w-full h-48 p-3 text-sm border border-gray-300 dark:border-gray-750 dark:bg-gray-950 dark:text-gray-200 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-sans resize-none transition-colors"
+                className="w-full h-48 p-3 text-sm border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-sans resize-none transition-colors"
                 placeholder={isFrench ? "Saisissez ou collez votre document détaillé ici..." : "Type or paste your master document here..."}
               />
            </div>
 
-           {error && <div className="p-3 bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400 border border-red-250 dark:border-red-900/50 rounded">{error}</div>}
+           {error && <div className="p-3 bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400 border border-red-200 dark:border-red-900/50 rounded">{error}</div>}
         </div>
 
         <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex justify-end gap-3 bg-gray-50 dark:bg-gray-950 rounded-b-xl">

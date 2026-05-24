@@ -143,7 +143,7 @@ export default function VersionManager({ data, onLoad, language }: Props) {
               value={newVersionName}
               onChange={(e) => setNewVersionName(e.target.value)}
               placeholder={isFrench ? "Ex: Développeur React - Google..." : "e.g. React Dev - Google..."}
-              className="flex-1 p-2 text-xs border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-250 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+              className="flex-1 p-2 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
               maxLength={40}
               required
             />

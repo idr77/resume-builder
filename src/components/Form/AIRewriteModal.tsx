@@ -111,14 +111,14 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
                value={customDirectives}
                onChange={(e) => setCustomDirectives(e.target.value)}
                placeholder={isFrench ? "Ex: Mettre en valeur la méthodologie agile et l'architecture cloud..." : "e.g. Highlight agile methodology and cloud architecture..."}
-               className="w-full p-2 text-xs border border-gray-300 dark:border-gray-750 dark:bg-gray-950 dark:text-gray-200 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 mb-2 transition-all"
+               className="w-full p-2 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 mb-2 transition-all"
              />
              <div className="flex flex-wrap gap-1.5">
                {presets.map(p => (
                  <button
                    key={p.label}
                    onClick={() => setCustomDirectives(p.value)}
-                   className={`px-2 py-1 rounded text-[10px] font-medium border transition cursor-pointer ${customDirectives === p.value ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-900 text-indigo-700 dark:text-indigo-350' : 'bg-gray-50 dark:bg-gray-955 hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400'}`}
+                   className={`px-2 py-1 rounded text-[10px] font-medium border transition cursor-pointer ${customDirectives === p.value ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-900 text-indigo-700 dark:text-indigo-350' : 'bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'}`}
                  >
                    {p.label}
                  </button>
@@ -141,7 +141,7 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
                <textarea 
                   value={originalText}
                   disabled
-                  className="w-full h-44 p-3 text-xs bg-gray-50 dark:bg-gray-955/50 border border-gray-200 dark:border-gray-800 rounded text-gray-500 dark:text-gray-400 resize-none font-mono leading-relaxed"
+                  className="w-full h-44 p-3 text-xs bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded text-gray-500 dark:text-gray-400 resize-none font-mono leading-relaxed"
                />
              </div>
              <div>
@@ -156,7 +156,7 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
                  <textarea 
                     value={proposedText}
                     onChange={(e) => setProposedText(e.target.value)}
-                    className="w-full h-44 p-3 text-xs border border-indigo-200 dark:border-indigo-900/50 dark:bg-gray-950 dark:text-gray-200 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-mono leading-relaxed transition-colors"
+                    className="w-full h-44 p-3 text-xs bg-white text-gray-900 border border-indigo-200 dark:border-indigo-900/50 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-mono leading-relaxed transition-colors"
                     placeholder={isFrench ? "Cliquez sur 'Générer la réécriture' ci-dessous pour lancer l'IA." : "Click 'Generate Rewrite' below to query the AI."}
                  />
                )}

@@ -139,13 +139,13 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
         <div className="flex gap-2">
           <button 
             onClick={handleExportData}
-            className="flex items-center gap-1 text-[10px] bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-750 font-bold transition cursor-pointer"
+            className="flex items-center gap-1 text-[10px] bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 font-bold transition cursor-pointer"
             title={isFrench ? "Exporter en JSON" : "Export to JSON"}
           >
             <Download size={12} />
             {isFrench ? 'Exporter' : 'Export'}
           </button>
-          <label className="flex items-center gap-1 text-[10px] bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-750 font-bold transition cursor-pointer">
+          <label className="flex items-center gap-1 text-[10px] bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 font-bold transition cursor-pointer">
             <Upload size={12} />
             {isFrench ? 'Importer' : 'Import'}
             <input type="file" accept=".json" onChange={handleImportData} className="hidden" />
@@ -166,35 +166,35 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
         <form onSubmit={handleCreateApplication} className="bg-white dark:bg-gray-900 border border-indigo-100 dark:border-indigo-950 p-4 rounded-lg shadow-md space-y-3 animate-fade-in transition-colors">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] font-bold text-gray-500 mb-1">{isFrench ? 'ENTREPRISE' : 'COMPANY'}</label>
+              <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{isFrench ? 'ENTREPRISE' : 'COMPANY'}</label>
               <input 
                 type="text" 
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="Google, Stripe..."
-                className="w-full p-2 text-xs border border-gray-300 dark:border-gray-750 dark:bg-gray-800 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+                className="w-full p-2 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
                 required
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-gray-500 mb-1">{isFrench ? 'INTITULÉ DU POSTE' : 'ROLE TITLE'}</label>
+              <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{isFrench ? 'INTITULÉ DU POSTE' : 'ROLE TITLE'}</label>
               <input 
                 type="text" 
                 value={roleTitle}
                 onChange={(e) => setRoleTitle(e.target.value)}
                 placeholder="Senior React Developer..."
-                className="w-full p-2 text-xs border border-gray-300 dark:border-gray-750 dark:bg-gray-800 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+                className="w-full p-2 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
                 required
               />
             </div>
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-gray-500 mb-1">{isFrench ? 'DESCRIPTION DE POSTE' : 'JOB DESCRIPTION'}</label>
+              <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{isFrench ? 'DESCRIPTION DE POSTE' : 'JOB DESCRIPTION'}</label>
             <textarea 
               value={jobDescription}
               onChange={(e) => setJobDescription(e.target.value)}
               placeholder={isFrench ? "Collez la description ici..." : "Paste the job description here..."}
-              className="w-full h-16 p-2 text-xs border border-gray-300 dark:border-gray-750 dark:bg-gray-800 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-none transition-colors"
+              className="w-full h-16 p-2 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-none transition-colors"
             />
           </div>
           <div className="flex justify-end gap-2 text-xs">
@@ -225,7 +225,7 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={isFrench ? "Rechercher une entreprise, un poste..." : "Search company, job..."}
-            className="w-full pl-9 pr-3 py-2 text-xs border border-gray-300 dark:border-gray-800 dark:bg-gray-900 rounded-lg focus:border-indigo-500 transition shadow-sm"
+            className="w-full pl-9 pr-3 py-2 text-xs border border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 rounded-lg focus:border-indigo-500 transition shadow-sm"
           />
         </div>
 
@@ -233,7 +233,7 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
         <select 
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="p-2 text-xs border border-gray-300 dark:border-gray-800 dark:bg-gray-900 rounded-lg focus:border-indigo-500 shadow-sm"
+          className="p-2 text-xs border border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 rounded-lg focus:border-indigo-500 shadow-sm"
         >
           <option value="all">{isFrench ? 'Tous les statuts' : 'All Status'}</option>
           <option value="draft">{isFrench ? 'Brouillon' : 'Draft'}</option>
@@ -260,7 +260,7 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
               <div
                 key={app.id}
                 onClick={() => onSelectApplication(app)}
-                className="bg-white dark:bg-gray-900 border border-gray-250 dark:border-gray-800 rounded-lg p-4 shadow-sm hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-900 transition-all cursor-pointer flex justify-between items-start"
+                className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4 shadow-sm hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-900 transition-all cursor-pointer flex justify-between items-start"
               >
                 <div className="space-y-2 min-w-0 mr-4">
                   <div>

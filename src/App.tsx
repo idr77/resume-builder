@@ -320,7 +320,7 @@ function App() {
           />
         )}
         
-        <main className="flex-1 overflow-hidden p-0 bg-gray-200 flex flex-col">
+        <main className="flex-1 overflow-hidden p-0 bg-gray-200 dark:bg-gray-900 flex flex-col transition-colors">
           <PDFViewer width="100%" height="100%" className="border-none flex-1">
             {previewTab === 'cv' ? (
               <PDFTemplate data={resumeData} template={resumeData.styleSettings?.template || 'classic'} />

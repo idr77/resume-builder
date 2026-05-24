@@ -162,7 +162,7 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
           <select 
             value={appStatus}
             onChange={handleStatusChange}
-            className="p-1 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 rounded focus:ring-1 focus:ring-indigo-500 bg-white"
+            className="p-1 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:ring-1 focus:ring-indigo-500 bg-white"
           >
             <option value="draft">{isFrench ? 'Brouillon' : 'Draft'}</option>
             <option value="applied">{isFrench ? 'Candidaté' : 'Applied'}</option>
@@ -201,7 +201,7 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
                 value={newStepTitle}
                 onChange={(e) => setNewStepTitle(e.target.value)}
                 placeholder={isFrench ? "Ex: Entretien RH, Tech..." : "e.g. HR Interview..."}
-                className="flex-1 p-1.5 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 rounded text-[11px]"
+                className="flex-1 p-1.5 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded text-[11px]"
                 required
               />
               <button 
@@ -222,7 +222,7 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
                     <div
                       key={step.id}
                       onClick={() => setActiveStepId(step.id)}
-                      className={`p-2 border rounded-lg cursor-pointer transition flex items-center justify-between ${isActive ? 'bg-indigo-50/50 border-indigo-300 dark:bg-indigo-950/20 dark:border-indigo-900' : 'border-gray-100 hover:bg-gray-50'}`}
+                      className={`p-2 border rounded-lg cursor-pointer transition flex items-center justify-between ${isActive ? 'bg-indigo-50/50 border-indigo-300 dark:bg-indigo-950/20 dark:border-indigo-900' : 'border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         {step.status === 'completed' ? (
@@ -270,11 +270,11 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
                 <textarea
                   value={dossierText}
                   onChange={(e) => { setDossierText(e.target.value); updateApplication({ skillsDossierText: e.target.value }); }}
-                  className="w-full h-24 p-1.5 text-[10px] border border-gray-200 dark:border-gray-800 dark:bg-gray-900 rounded resize-none"
+                  className="w-full h-24 p-1.5 text-[10px] border border-gray-200 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 rounded resize-none"
                 />
                 <button
                   onClick={() => { setDossierText(''); setFileName(''); updateApplication({ skillsDossierText: '', skillsDossierFileName: '' }); }}
-                  className="absolute bottom-2 right-2 text-xs text-red-500 hover:text-red-700 bg-white shadow-sm border border-red-100 rounded px-1"
+                  className="absolute bottom-2 right-2 text-xs text-red-500 hover:text-red-700 bg-white dark:bg-gray-800 shadow-sm border border-red-100 dark:border-red-900 rounded px-1"
                 >
                   {isFrench ? 'Retirer' : 'Remove'}
                 </button>
@@ -289,8 +289,8 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4 rounded-lg shadow-sm transition-colors text-xs space-y-4">
               
               {/* Active Step Details */}
-              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                <h3 className="text-sm font-bold text-indigo-700 flex items-center gap-1.5">
+              <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-3">
+                <h3 className="text-sm font-bold text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
                   <Calendar size={15} />
                   {isFrench ? `Étape : ${activeStep.title}` : `Step: ${activeStep.title}`}
                 </h3>
@@ -301,7 +301,7 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
                   <select
                     value={activeStep.status}
                     onChange={(e) => handleUpdateStepField(activeStep.id, 'status', e.target.value as any)}
-                    className="p-1 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 rounded bg-white text-[11px]"
+                    className="p-1 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded bg-white text-[11px]"
                   >
                     <option value="pending">{isFrench ? 'À venir' : 'Pending'}</option>
                     <option value="completed">{isFrench ? 'Complété' : 'Completed'}</option>
@@ -319,13 +319,13 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
                 <textarea 
                   value={activeStep.notes || ''}
                   onChange={(e) => handleUpdateStepField(activeStep.id, 'notes', e.target.value)}
-                  className="w-full h-32 p-3 text-xs border border-gray-300 dark:border-gray-750 dark:bg-gray-800 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-sans resize-none transition-colors"
+                  className="w-full h-32 p-3 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-sans resize-none transition-colors"
                   placeholder={isFrench ? "- Vos questions prévues...\n- Réponses du recruteur...\n- Salaire évoqué : 65k...\n- Feedback : positif" : "- Questions to prepare...\n- Interviewer answers...\n- Budget discuss: 65k...\n- Feedback: Positive"}
                 />
               </div>
 
               {/* AI Preparation block */}
-              <div className="border-t border-gray-100 pt-4 space-y-3">
+              <div className="border-t border-gray-100 dark:border-gray-800 pt-4 space-y-3">
                 <div className="flex justify-between items-center">
                   <h4 className="font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
                     <Sparkles size={14} className="text-indigo-500" />
@@ -346,12 +346,12 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
                 </div>
 
                 {aiError && (
-                  <div className="p-2.5 bg-red-50 text-red-600 border border-red-100 rounded">{aiError}</div>
+                  <div className="p-2.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-800 rounded">{aiError}</div>
                 )}
 
                 {activeStep.aiPrep ? (
-                  <div className="bg-indigo-50/20 dark:bg-indigo-950/10 border border-indigo-150/40 rounded-lg p-3 max-h-72 overflow-y-auto pr-2 scrollbar-thin">
-                    <div className="text-[11px] leading-relaxed text-gray-700 dark:text-gray-350 whitespace-pre-line font-sans">
+                  <div className="bg-indigo-50/20 dark:bg-indigo-950/10 border border-indigo-100/40 dark:border-indigo-900/40 rounded-lg p-3 max-h-72 overflow-y-auto pr-2 scrollbar-thin">
+                    <div className="text-[11px] leading-relaxed text-gray-700 dark:text-gray-300 whitespace-pre-line font-sans">
                       {activeStep.aiPrep}
                     </div>
                   </div>
@@ -379,7 +379,7 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
             <textarea 
               value={jdText}
               onChange={(e) => setJdText(e.target.value)}
-              className="w-full h-32 p-3 border border-gray-300 dark:border-gray-800 dark:bg-gray-950 rounded resize-none"
+              className="w-full h-32 p-3 border border-gray-300 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 rounded resize-none transition-colors"
             />
             <div className="flex justify-end">
               <button 
