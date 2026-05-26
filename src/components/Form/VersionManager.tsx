@@ -29,9 +29,37 @@ export default function VersionManager({ data, onLoad, language }: Props) {
       return true;
     } catch (e: any) {
       if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
+        // Reactive Pruning: Try to delete the oldest version (not 'initial') to free space
+        try {
+          const stored = localStorage.getItem('ats_resumes_history');
+          if (stored) {
+            const parsed = JSON.parse(stored) as SavedVersion[];
+            const nonInitial = parsed.filter(v => v.id !== 'initial');
+            if (nonInitial.length > 0) {
+              const oldest = nonInitial[nonInitial.length - 1];
+              const updatedVersions = parsed.filter(v => v.id !== oldest.id);
+              
+              // Save the pruned versions list to free space
+              localStorage.setItem('ats_resumes_history', JSON.stringify(updatedVersions));
+              setVersions(updatedVersions);
+              
+              // Retry saving the original request
+              localStorage.setItem(key, value);
+              
+              showNotification(language === 'fr' 
+                ? `Mémoire saturée : la version "${oldest.name}" a été nettoyée.`
+                : `Storage full: version "${oldest.name}" was automatically pruned.`
+              );
+              return true;
+            }
+          }
+        } catch (pruneErr) {
+          console.error('Failed to auto-prune on QuotaExceededError:', pruneErr);
+        }
+
         const errorMsg = language === 'fr'
-          ? "La mémoire locale est saturée (Quota de 5 Mo dépassé). Veuillez supprimer d'anciennes versions pour libérer de l'espace ou retirer votre photo de profil."
-          : "Local storage is full (5MB quota exceeded). Please delete older versions or compress your profile photo to free up space.";
+          ? "La mémoire locale est saturée (Quota de 5 Mo dépassé). Veuillez supprimer d'anciennes versions pour libérer de l'espace ou vider le stockage."
+          : "Local storage is full (5MB quota exceeded). Please delete older versions or clear the storage in settings.";
         alert(errorMsg);
         setMessage(language === 'fr' ? "Erreur : Mémoire saturée !" : "Error: Storage full!");
       } else {
@@ -108,6 +136,17 @@ export default function VersionManager({ data, onLoad, language }: Props) {
     }
   };
 
+  const MAX_VERSIONS = 10;
+
+  const pruneHistoryList = (list: SavedVersion[]): SavedVersion[] => {
+    if (list.length <= MAX_VERSIONS) return list;
+    const initialVersion = list.find(v => v.id === 'initial');
+    const others = list.filter(v => v.id !== 'initial');
+    const allowedOthersCount = initialVersion ? MAX_VERSIONS - 1 : MAX_VERSIONS;
+    const keptOthers = others.slice(0, allowedOthersCount);
+    return initialVersion ? [initialVersion, ...keptOthers] : keptOthers;
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVersionName.trim()) return;
@@ -128,7 +167,7 @@ export default function VersionManager({ data, onLoad, language }: Props) {
       }
     };
 
-    const updated = [newVersion, ...versions.filter(v => v.name !== newVersion.name)];
+    const updated = pruneHistoryList([newVersion, ...versions.filter(v => v.name !== newVersion.name)]);
     if (safeSetLocalStorage('ats_resumes_history', JSON.stringify(updated))) {
       setVersions(updated);
       setNewVersionName('');
@@ -148,7 +187,7 @@ export default function VersionManager({ data, onLoad, language }: Props) {
       updatedAt: new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
       data: version.data
     };
-    const updated = [duplicated, ...versions];
+    const updated = pruneHistoryList([duplicated, ...versions]);
     if (safeSetLocalStorage('ats_resumes_history', JSON.stringify(updated))) {
       setVersions(updated);
       showNotification(language === 'fr' ? 'Version dupliquée !' : 'Version duplicated!');

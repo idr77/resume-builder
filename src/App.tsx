@@ -11,6 +11,7 @@ import SettingsModal from './components/Form/SettingsModal';
 import OptimizationDashboard from './components/Preview/OptimizationDashboard';
 import { analyzeResumeMatch } from './utils/atsOptimizer';
 import { translateResumeWithGemini } from './utils/geminiApiService';
+import { compressImage } from './utils/imageCompressor';
 import { Settings, Languages, Loader2, Sun, Moon, Briefcase, FileText as FileIcon } from 'lucide-react';
 import ApplicationTracker from './components/Tracker/ApplicationTracker';
 import ApplicationDetail from './components/Tracker/ApplicationDetail';
@@ -18,6 +19,8 @@ import type { JobApplication } from './types/tracker';
 
 function App() {
   const [resumeData, setResumeData] = useState<ResumeData>(initialResumeState);
+  const [debouncedResumeData, setDebouncedResumeData] = useState<ResumeData>(initialResumeState);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [showImportOpen, setShowImportOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
@@ -38,13 +41,42 @@ function App() {
     localStorage.setItem('app_theme', theme);
   }, [theme]);
 
+  // Debounce resumeData changes for heavy PDF generation to prevent input lag
+  useEffect(() => {
+    setIsGeneratingPreview(true);
+    const timer = setTimeout(() => {
+      setDebouncedResumeData(resumeData);
+      setIsGeneratingPreview(false);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [resumeData]);
+
   const atsResult = useMemo(() => analyzeResumeMatch(resumeData, aiKeywords), [resumeData, aiKeywords]);
 
-  const handleImport = (text: string) => {
+  const handleImport = async (text: string) => {
     try {
       const parsed = JSON.parse(text);
       if (parsed && typeof parsed === 'object' && parsed.personalInfo) {
-        setResumeData({ ...resumeData, ...parsed, language: resumeData.language }); // Keep current language setting
+        // Automatically compress photoUrl if it's a large Base64 string in the imported JSON CV
+        let photoUrl = parsed.personalInfo.photoUrl;
+        if (photoUrl && photoUrl.startsWith('data:image/') && photoUrl.length > 70000) {
+          try {
+            console.log("Compressing large base64 photoUrl from imported JSON CV...");
+            photoUrl = await compressImage(photoUrl);
+          } catch (err) {
+            console.error("Failed to compress imported photoUrl:", err);
+          }
+        }
+
+        setResumeData({
+          ...resumeData,
+          ...parsed,
+          personalInfo: {
+            ...parsed.personalInfo,
+            photoUrl: photoUrl
+          },
+          language: resumeData.language
+        });
         return;
       }
     } catch (e) {
@@ -286,25 +318,33 @@ function App() {
         <OptimizationDashboard data={resumeData} onChange={setResumeData} result={atsResult} setAiKeywords={setAiKeywords} />
 
         <header className="px-6 py-3.5 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm flex items-center justify-between transition-colors">
-          <div className="flex gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg transition-colors">
-            <button 
-              className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${previewTab === 'cv' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}
-              onClick={() => setPreviewTab('cv')}
-            >
-              📄 {resumeData.language === 'fr' ? 'Mon CV' : 'My CV'}
-            </button>
-            <button 
-              className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${previewTab === 'cl' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}
-              onClick={() => setPreviewTab('cl')}
-            >
-              ✉️ {resumeData.language === 'fr' ? 'Lettre de Motivation' : 'Cover Letter'}
-            </button>
+          <div className="flex items-center gap-3">
+            <div className="flex gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg transition-colors">
+              <button 
+                className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${previewTab === 'cv' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}
+                onClick={() => setPreviewTab('cv')}
+              >
+                📄 {resumeData.language === 'fr' ? 'Mon CV' : 'My CV'}
+              </button>
+              <button 
+                className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${previewTab === 'cl' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}
+                onClick={() => setPreviewTab('cl')}
+              >
+                ✉️ {resumeData.language === 'fr' ? 'Lettre de Motivation' : 'Cover Letter'}
+              </button>
+            </div>
+            {isGeneratingPreview && (
+              <span className="flex items-center gap-1.5 text-[10px] text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1 rounded-full font-medium border border-indigo-100 dark:border-indigo-900/50 animate-pulse transition-all">
+                <Loader2 size={11} className="animate-spin text-indigo-500 dark:text-indigo-400" />
+                <span>{resumeData.language === 'fr' ? 'Synchronisation...' : 'Syncing...'}</span>
+              </span>
+            )}
           </div>
 
           <PDFDownloadLink 
             document={previewTab === 'cv' 
-              ? <PDFTemplate data={resumeData} template={resumeData.styleSettings?.template || 'classic'} /> 
-              : <CoverLetterPDFTemplate data={resumeData} />
+              ? <PDFTemplate data={debouncedResumeData} template={debouncedResumeData.styleSettings?.template || 'classic'} /> 
+              : <CoverLetterPDFTemplate data={debouncedResumeData} />
             } 
             fileName={previewTab === 'cv' 
               ? `${resumeData.personalInfo.fullName.replace(/\s+/g, '_')}_Resume.pdf`
@@ -332,9 +372,9 @@ function App() {
         <main className="flex-1 overflow-hidden p-0 bg-gray-200 dark:bg-gray-900 flex flex-col transition-colors">
           <PDFViewer width="100%" height="100%" className="border-none flex-1">
             {previewTab === 'cv' ? (
-              <PDFTemplate data={resumeData} template={resumeData.styleSettings?.template || 'classic'} />
+              <PDFTemplate data={debouncedResumeData} template={debouncedResumeData.styleSettings?.template || 'classic'} />
             ) : (
-              <CoverLetterPDFTemplate data={resumeData} />
+              <CoverLetterPDFTemplate data={debouncedResumeData} />
             )}
           </PDFViewer>
         </main>

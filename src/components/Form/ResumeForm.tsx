@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import type { ResumeData, Experience, Education } from '../../types/resume';
-import { ChevronDown, ChevronUp, Plus, Trash2, Sparkles, Loader2, FileText } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, Sparkles, Loader2, FileText, X } from 'lucide-react';
 import { getTranslation } from '../../i18n/translations';
 import AIRewriteModal from './AIRewriteModal';
 import AIGlobalOptimizeModal from './AIGlobalOptimizeModal';
 import VersionManager from './VersionManager';
 import { generateSkillsFromExperienceWithGemini, generateCoverLetterWithGemini } from '../../utils/geminiApiService';
 import { compressImage } from '../../utils/imageCompressor';
+import { ITSkillsDictionary } from '../../utils/itSkillsDictionary';
 
 interface Props {
   data: ResumeData;
@@ -22,6 +23,47 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
   const [isGeneratingSkills, setIsGeneratingSkills] = useState(false);
   const [isGeneratingCoverLetter, setIsGeneratingCoverLetter] = useState(false);
   const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
+
+  // States for interactive skills tags editor
+  const [skillInput, setSkillInput] = useState('');
+  const [isSkillFocused, setIsSkillFocused] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
+
+  const handleAddSkill = (skillName: string) => {
+    const cleaned = skillName.trim();
+    if (!cleaned) return;
+    
+    // Check if duplicate
+    const isDuplicate = data.skills.some(s => s.name.toLowerCase() === cleaned.toLowerCase());
+    if (isDuplicate) {
+      setSkillInput('');
+      return;
+    }
+
+    const newSkill = {
+      id: `sk-${Date.now()}`,
+      name: cleaned
+    };
+    
+    handleFieldChange('skills', [...data.skills, newSkill]);
+    setSkillInput('');
+  };
+
+  const getQuickRecommendations = () => {
+    const popular = [
+      "JavaScript", "TypeScript", "React", "Node.js", "Python", 
+      "SQL", "Docker", "AWS", "Git", "Agile", "Management", "Communication"
+    ];
+    return popular.filter(skill => 
+      !data.skills.some(s => s.name.toLowerCase() === skill.toLowerCase())
+    ).slice(0, 6);
+  };
+
+  const suggestions = ITSkillsDictionary.filter(skill => {
+    const isAlreadyAdded = data.skills.some(s => s.name.toLowerCase() === skill.toLowerCase());
+    if (isAlreadyAdded) return false;
+    return skill.toLowerCase().includes(skillInput.toLowerCase());
+  }).slice(0, 8);
 
   const toggleSection = (section: string) => {
     setOpenSection(openSection === section ? null : section);
@@ -353,19 +395,152 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
         </button>
         {openSection === 'tags' && (
           <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-             <div className="mb-4">
+             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">{t.skills}</label>
-              <textarea 
-                value={data.skills.map(s => s.name).join(',')} 
-                onChange={(e) => {
-                  const items = e.target.value.split(',');
-                  handleFieldChange('skills', items.map((name, i) => ({ id: `sk-${i}`, name })));
-                }}
-                className="w-full p-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" 
-                rows={2}
-                placeholder={t.skillsPlaceholder}
-              />
-              <div className="flex flex-wrap gap-2 mt-2">
+              
+              {/* Visual Tags for existing skills */}
+              <div className="flex flex-wrap gap-1.5 mb-3 max-h-40 overflow-y-auto p-1 bg-gray-50 dark:bg-gray-950/40 rounded-md border border-gray-100 dark:border-gray-800/80">
+                {data.skills.map((skill) => (
+                  <span 
+                    key={skill.id}
+                    className="inline-flex items-center gap-1.5 text-xs bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 px-2.5 py-1 rounded-md border border-indigo-100 dark:border-indigo-900/40 font-semibold shadow-sm transition-all hover:border-indigo-300 dark:hover:border-indigo-800"
+                  >
+                    <span>{skill.name}</span>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const updated = data.skills.filter(s => s.id !== skill.id);
+                        handleFieldChange('skills', updated);
+                      }}
+                      className="text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-200 transition-colors focus:outline-none cursor-pointer"
+                      title={data.language === 'fr' ? 'Supprimer' : 'Delete'}
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                ))}
+                {data.skills.length === 0 && (
+                  <span className="text-xs text-gray-400 dark:text-gray-500 italic p-1">
+                    {data.language === 'fr' ? 'Aucune compétence ajoutée.' : 'No skills added yet.'}
+                  </span>
+                )}
+              </div>
+
+              {/* Input field and Autocomplete Dropdown */}
+              <div className="relative">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input 
+                      type="text" 
+                      value={skillInput}
+                      onChange={(e) => {
+                        setSkillInput(e.target.value);
+                        setActiveSuggestionIndex(0);
+                      }}
+                      onFocus={() => setIsSkillFocused(true)}
+                      onBlur={() => {
+                        // Delay hide to allow clicks to register on dropdown items
+                        setTimeout(() => setIsSkillFocused(false), 200);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (suggestions.length > 0 && skillInput.trim()) {
+                            const toAdd = suggestions[activeSuggestionIndex] || skillInput.trim();
+                            handleAddSkill(toAdd);
+                          } else if (skillInput.trim()) {
+                            handleAddSkill(skillInput.trim());
+                          }
+                        } else if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          setActiveSuggestionIndex(prev => Math.min(suggestions.length - 1, prev + 1));
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          setActiveSuggestionIndex(prev => Math.max(0, prev - 1));
+                        } else if (e.key === ',' || e.key === ';') {
+                          e.preventDefault();
+                          if (skillInput.trim()) {
+                            handleAddSkill(skillInput.trim());
+                          }
+                        }
+                      }}
+                      placeholder={data.language === 'fr' ? "Saisir une compétence (ex: React, Management...)" : "Enter a skill (e.g. React, Management...)"}
+                      className="w-full p-2 text-sm bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+                    />
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      if (skillInput.trim()) {
+                        handleAddSkill(skillInput.trim());
+                      }
+                    }}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm font-semibold shadow-sm transition-colors cursor-pointer"
+                  >
+                    {data.language === 'fr' ? 'Ajouter' : 'Add'}
+                  </button>
+                </div>
+
+                {/* Suggestions list */}
+                {isSkillFocused && (skillInput.trim().length > 0 || suggestions.length > 0) && (
+                  <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-md shadow-lg z-50 max-h-60 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
+                    {suggestions.map((suggestion, idx) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onMouseDown={() => handleAddSkill(suggestion)}
+                        className={`w-full text-left px-3 py-2 text-xs transition-colors cursor-pointer flex items-center justify-between ${
+                          idx === activeSuggestionIndex 
+                            ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-semibold' 
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/40'
+                        }`}
+                      >
+                        <span>{suggestion}</span>
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500 font-normal">
+                          {data.language === 'fr' ? 'Suggéré' : 'Suggested'}
+                        </span>
+                      </button>
+                    ))}
+                    {skillInput.trim() && !suggestions.some(s => s.toLowerCase() === skillInput.trim().toLowerCase()) && (
+                      <button
+                        key="create-custom-skill"
+                        type="button"
+                        onMouseDown={() => handleAddSkill(skillInput.trim())}
+                        className="w-full text-left px-3 py-2 text-xs text-indigo-600 dark:text-indigo-400 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors font-medium flex items-center justify-between cursor-pointer"
+                      >
+                        <span>{data.language === 'fr' ? `Créer "${skillInput.trim()}"` : `Create "${skillInput.trim()}"`}</span>
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500">
+                          {data.language === 'fr' ? 'Personnalisé' : 'Custom'}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Dynamic Quick Recommendations */}
+              {!skillInput.trim() && (
+                <div className="mt-3">
+                  <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider block mb-1.5">
+                    {data.language === 'fr' ? 'Suggestions rapides :' : 'Quick recommendations:'}
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {getQuickRecommendations().map(recSkill => (
+                      <button
+                        key={recSkill}
+                        type="button"
+                        onClick={() => handleAddSkill(recSkill)}
+                        className="text-[10px] bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 dark:bg-gray-850/50 dark:text-gray-400 dark:hover:bg-gray-800 dark:border-gray-700/60 px-2 py-0.5 rounded transition cursor-pointer font-semibold"
+                      >
+                        + {recSkill}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* AI action buttons */}
+              <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-gray-800/80">
                 <button
                   onClick={() => setRewriteSkillsOpen(true)}
                   className="flex items-center gap-1 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 px-2.5 py-1 rounded transition w-max cursor-pointer"
