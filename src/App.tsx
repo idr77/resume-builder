@@ -16,6 +16,7 @@ import { Settings, Languages, Loader2, Sun, Moon, Briefcase, FileText as FileIco
 import ApplicationTracker from './components/Tracker/ApplicationTracker';
 import ApplicationDetail from './components/Tracker/ApplicationDetail';
 import type { JobApplication } from './types/tracker';
+import { apiService } from './utils/apiService';
 
 function App() {
   const [resumeData, setResumeData] = useState<ResumeData>(initialResumeState);
@@ -40,6 +41,26 @@ function App() {
     }
     localStorage.setItem('app_theme', theme);
   }, [theme]);
+
+  // Cloud dynamic loading of the latest resume version on mount
+  useEffect(() => {
+    const loadLatestCloudResume = async () => {
+      try {
+        const online = await apiService.checkHealth();
+        if (online && apiService.isLoggedIn()) {
+          const cloudVersions = await apiService.fetchVersions();
+          if (cloudVersions.length > 0) {
+            // Sort to ensure we take the absolute newest modified version
+            setResumeData(cloudVersions[0].data);
+            setDebouncedResumeData(cloudVersions[0].data);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load cloud CV data on mount", err);
+      }
+    };
+    loadLatestCloudResume();
+  }, []);
 
   // Debounce resumeData changes for heavy PDF generation to prevent input lag
   useEffect(() => {
@@ -124,8 +145,11 @@ function App() {
   const t = getTranslation(resumeData.language).app;
 
   const handleTranslate = async (targetLang: 'en' | 'fr') => {
+    const online = await apiService.checkHealth();
+    const isCloudConnected = online && apiService.isLoggedIn();
     const apiKey = localStorage.getItem('gemini_api_key');
-    if (!apiKey) {
+
+    if (!apiKey && !isCloudConnected) {
       alert(t.translationError);
       setShowSettings(true);
       return;
@@ -134,7 +158,21 @@ function App() {
     setIsTranslating(true);
     try {
       const { targetJobDescription, ...dataToTranslate } = resumeData;
-      const translatedJson = await translateResumeWithGemini(apiKey, JSON.stringify(dataToTranslate), targetLang);
+      let translatedJson = '';
+
+      if (isCloudConnected) {
+        // Secure call proxied through AI Gateway
+        const systemInstruction = `You are a professional resume translation assistant. Translate the following CV JSON structure into ${targetLang === 'en' ? 'English' : 'French'}. Preserve all JSON keys exactly and output ONLY valid JSON without any wrapper markdown.`;
+        const userPrompt = JSON.stringify(dataToTranslate);
+        
+        translatedJson = await apiService.proxyLlm(systemInstruction, userPrompt, 'GEMINI');
+        // Clean potential wrapper tags from AI response
+        if (translatedJson.startsWith('```')) {
+          translatedJson = translatedJson.replace(/^```json\n?|```$/g, '').trim();
+        }
+      } else {
+        translatedJson = await translateResumeWithGemini(apiKey!, JSON.stringify(dataToTranslate), targetLang);
+      }
       
       const parsedData = JSON.parse(translatedJson);
       
@@ -157,9 +195,9 @@ function App() {
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const result = event.target?.result;
-      if (typeof result === 'string') {
-        handleImport(result);
+      const text = event.target?.result;
+      if (typeof text === 'string') {
+        handleImport(text);
       }
     };
     reader.readAsText(file);
@@ -218,7 +256,7 @@ function App() {
             )}
             
             <div className="h-6 w-px bg-gray-700"></div>
-
+ 
             <button 
               onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
               className="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-300 hover:text-white"
@@ -257,8 +295,19 @@ function App() {
               <ApplicationDetail 
                 application={selectedApplication} 
                 onBack={() => setSelectedApplication(null)}
-                onUpdate={(updated) => {
+                onUpdate={async (updated) => {
                   setSelectedApplication(updated);
+                  // Securely sync to PostgreSQL if connected, otherwise fallback
+                  try {
+                    const online = await apiService.checkHealth();
+                    if (online && apiService.isLoggedIn()) {
+                      await apiService.saveApplication(updated);
+                      return;
+                    }
+                  } catch (err) {
+                    console.warn("Cloud save failed, saving to local storage fallback", err);
+                  }
+
                   const stored = localStorage.getItem('ats_applications_tracker');
                   if (stored) {
                     const parsed = JSON.parse(stored) as JobApplication[];

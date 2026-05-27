@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { JobApplication, InterviewStep, ApplicationStatus } from '../../types/tracker';
 import { generateInterviewPrepWithGemini } from '../../utils/geminiApiService';
+import { apiService } from '../../utils/apiService';
 import { ArrowLeft, Plus, Trash2, Sparkles, Loader2, Calendar, FileText, CheckCircle, Clock, XCircle, Save, FileUp } from 'lucide-react';
 
 interface Props {
@@ -24,7 +25,7 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
   
   // Timeline Step States
   const [activeStepId, setActiveStepId] = useState<string | null>(
-    application.interviewSteps.length > 0 ? application.interviewSteps[0].id : null
+    application.interviewSteps && application.interviewSteps.length > 0 ? application.interviewSteps[0].id : null
   );
   const [newStepTitle, setNewStepTitle] = useState('');
   
@@ -70,7 +71,8 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
       aiPrep: ''
     };
 
-    const updatedSteps = [...application.interviewSteps, newStep];
+    const currentSteps = application.interviewSteps || [];
+    const updatedSteps = [...currentSteps, newStep];
     updateApplication({ interviewSteps: updatedSteps });
     setNewStepTitle('');
     setActiveStepId(newStep.id);
@@ -80,7 +82,8 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
     const confirmMsg = isFrench ? "Supprimer cette étape d'entretien ?" : "Delete this interview step?";
     if (!window.confirm(confirmMsg)) return;
 
-    const updatedSteps = application.interviewSteps.filter(s => s.id !== stepId);
+    const currentSteps = application.interviewSteps || [];
+    const updatedSteps = currentSteps.filter(s => s.id !== stepId);
     updateApplication({ interviewSteps: updatedSteps });
     
     if (activeStepId === stepId) {
@@ -89,7 +92,8 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
   };
 
   const handleUpdateStepField = <K extends keyof InterviewStep>(stepId: string, key: K, value: InterviewStep[K]) => {
-    const updatedSteps = application.interviewSteps.map(s => {
+    const currentSteps = application.interviewSteps || [];
+    const updatedSteps = currentSteps.map(s => {
       if (s.id === stepId) {
         return { ...s, [key]: value };
       }
@@ -116,24 +120,47 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
     reader.readAsText(file);
   };
 
-  // Query Gemini for Interview Preparation Guide
+  // Query Gemini or proxy through Backend AI Gateway for Interview Preparation Guide
   const handleGeneratePrep = async (stepId: string, stepTitle: string) => {
     setAiError('');
     setLoadingStepId(stepId);
 
     try {
+      const online = await apiService.checkHealth();
+      const isCloudConnected = online && apiService.isLoggedIn();
       const apiKey = localStorage.getItem('gemini_api_key');
-      if (!apiKey) throw new Error(isFrench ? 'Clé API Gemini manquante. Allez dans les paramètres.' : 'Missing Gemini API Key. Go to Settings.');
-
-      const resumeData = application.resumeDataUsed || application.resumeDataUsed || {};
       
-      const prepGuide = await generateInterviewPrepWithGemini(
-        apiKey,
-        JSON.stringify(resumeData),
-        application.jobDescription || jdText,
-        stepTitle,
-        dossierText
-      );
+      if (!apiKey && !isCloudConnected) {
+        throw new Error(isFrench 
+          ? 'Clé API Gemini manquante. Configurez votre clé ou connectez-vous au Cloud.' 
+          : 'Missing Gemini API Key. Configure a key or connect to Cloud.');
+      }
+
+      const resumeData = application.resumeDataUsed || {};
+      let prepGuide = '';
+
+      if (isCloudConnected) {
+        // Secures calls via Backend Proxy Gateway (Uses Server Global Key or User Decrypted Key)
+        const systemInstruction = isFrench
+          ? "Vous êtes un coach en recrutement expert. Préparez un plan d'entraînement d'entretien structuré et des conseils basés sur le CV et l'offre d'emploi."
+          : "You are an expert recruitment coach. Generate a structured interview prep plan and advice based on the resume and job offer.";
+        const userPrompt = `
+          Étape d'entretien : "${stepTitle}"
+          CV du Candidat : ${JSON.stringify(resumeData)}
+          Offre d'emploi : ${application.jobDescription || jdText}
+          Notes supplémentaires / Master Dossier : ${dossierText || 'Aucun document supplémentaire.'}
+        `;
+        prepGuide = await apiService.proxyLlm(systemInstruction, userPrompt, 'GEMINI');
+      } else {
+        // Frontend direct browser call (Fallback)
+        prepGuide = await generateInterviewPrepWithGemini(
+          apiKey!,
+          JSON.stringify(resumeData),
+          application.jobDescription || jdText,
+          stepTitle,
+          dossierText
+        );
+      }
 
       handleUpdateStepField(stepId, 'aiPrep', prepGuide);
     } catch (err: any) {
@@ -143,7 +170,8 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
     }
   };
 
-  const activeStep = application.interviewSteps.find(s => s.id === activeStepId);
+  const currentSteps = application.interviewSteps || [];
+  const activeStep = currentSteps.find(s => s.id === activeStepId);
 
   return (
     <div className="space-y-4 max-h-[calc(100vh-140px)] overflow-y-auto pr-1">
@@ -162,7 +190,7 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
           <select 
             value={appStatus}
             onChange={handleStatusChange}
-            className="p-1 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:ring-1 focus:ring-indigo-500 bg-white"
+            className="p-1 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:ring-1 focus:ring-indigo-500 bg-white cursor-pointer"
           >
             <option value="draft">{isFrench ? 'Brouillon' : 'Draft'}</option>
             <option value="applied">{isFrench ? 'Candidaté' : 'Applied'}</option>
@@ -206,17 +234,17 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
               />
               <button 
                 type="submit"
-                className="bg-indigo-600 hover:bg-indigo-700 text-white p-1.5 rounded transition cursor-pointer"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white p-1.5 rounded transition cursor-pointer flex items-center justify-center"
               >
                 <Plus size={14} />
               </button>
             </form>
 
             <div className="space-y-1.5">
-              {application.interviewSteps.length === 0 ? (
+              {currentSteps.length === 0 ? (
                 <p className="italic text-gray-400 text-center py-4">{isFrench ? 'Aucune étape définie.' : 'No steps defined yet.'}</p>
               ) : (
-                application.interviewSteps.map(step => {
+                currentSteps.map(step => {
                   const isActive = step.id === activeStepId;
                   return (
                     <div
@@ -235,8 +263,9 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
                         <span className="font-semibold text-gray-700 dark:text-gray-300 truncate">{step.title}</span>
                       </div>
                       <button
+                        type="button"
                         onClick={(e) => { e.stopPropagation(); handleDeleteStep(step.id); }}
-                        className="text-gray-400 hover:text-red-500 p-0.5 rounded"
+                        className="text-gray-400 hover:text-red-500 p-0.5 rounded cursor-pointer"
                       >
                         <Trash2 size={11} />
                       </button>
@@ -273,8 +302,9 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
                   className="w-full h-24 p-1.5 text-[10px] border border-gray-200 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 rounded resize-none"
                 />
                 <button
+                  type="button"
                   onClick={() => { setDossierText(''); setFileName(''); updateApplication({ skillsDossierText: '', skillsDossierFileName: '' }); }}
-                  className="absolute bottom-2 right-2 text-xs text-red-500 hover:text-red-700 bg-white dark:bg-gray-800 shadow-sm border border-red-100 dark:border-red-900 rounded px-1"
+                  className="absolute bottom-2 right-2 text-xs text-red-500 hover:text-red-700 bg-white dark:bg-gray-800 shadow-sm border border-red-100 dark:border-red-900 rounded px-1 cursor-pointer"
                 >
                   {isFrench ? 'Retirer' : 'Remove'}
                 </button>
@@ -301,7 +331,7 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
                   <select
                     value={activeStep.status}
                     onChange={(e) => handleUpdateStepField(activeStep.id, 'status', e.target.value as any)}
-                    className="p-1 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded bg-white text-[11px]"
+                    className="p-1 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded bg-white text-[11px] cursor-pointer"
                   >
                     <option value="pending">{isFrench ? 'À venir' : 'Pending'}</option>
                     <option value="completed">{isFrench ? 'Complété' : 'Completed'}</option>
@@ -333,6 +363,7 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
                   </h4>
                   
                   <button
+                    type="button"
                     onClick={() => handleGeneratePrep(activeStep.id, activeStep.title)}
                     disabled={loadingStepId !== null}
                     className="flex items-center gap-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-400 px-3 py-1.5 rounded-full font-bold text-[10px] transition cursor-pointer disabled:opacity-50"
@@ -383,6 +414,7 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
             />
             <div className="flex justify-end">
               <button 
+                type="button"
                 onClick={handleJdUpdate}
                 className="flex items-center gap-1.5 bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-950 px-4 py-1.5 rounded text-xs font-bold hover:opacity-90 transition cursor-pointer"
               >

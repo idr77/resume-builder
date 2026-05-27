@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import type { JobApplication, ApplicationStatus } from '../../types/tracker';
 import type { ResumeData } from '../../types/resume';
-import { Search, Briefcase, Plus, Download, Upload, Trash2, Calendar, CheckSquare } from 'lucide-react';
+import { Search, Briefcase, Plus, Download, Upload, Trash2, Calendar, CheckSquare, Cloud, Database, Loader2 } from 'lucide-react';
+import { apiService } from '../../utils/apiService';
 
 interface Props {
   activeResumeData: ResumeData;
@@ -22,6 +23,8 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
   const [filter, setFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [isCloud, setIsCloud] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // New Application Form State
   const [companyName, setCompanyName] = useState('');
@@ -30,9 +33,26 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
 
   useEffect(() => {
     loadApplications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadApplications = () => {
+  const loadApplications = async () => {
+    setIsLoading(true);
+    try {
+      const online = await apiService.checkHealth();
+      if (online && apiService.isLoggedIn()) {
+        const cloudApps = await apiService.fetchApplications();
+        setApplications(cloudApps);
+        setIsCloud(true);
+        setIsLoading(false);
+        return;
+      }
+    } catch (e) {
+      console.warn('Backend server offline or unauthenticated. Falling back to local applications tracker.', e);
+    }
+
+    // Local Storage Fallback
+    setIsCloud(false);
     try {
       const stored = localStorage.getItem('ats_applications_tracker');
       if (stored) {
@@ -40,6 +60,8 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
       }
     } catch (e) {
       console.error('Error loading applications tracker', e);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -57,7 +79,7 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
     setApplications(updated);
   };
 
-  const handleCreateApplication = (e: React.FormEvent) => {
+  const handleCreateApplication = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyName.trim() || !roleTitle.trim()) return;
 
@@ -72,23 +94,54 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
       resumeDataUsed: activeResumeData
     };
 
+    if (isCloud) {
+      setIsLoading(true);
+      try {
+        await apiService.saveApplication(newApp);
+        const cloudApps = await apiService.fetchApplications();
+        setApplications(cloudApps);
+        setCompanyName('');
+        setRoleTitle('');
+        setJobDescription('');
+        setShowAddForm(false);
+      } catch (err) {
+        alert(language === 'fr' ? "Erreur de sauvegarde Cloud." : "Cloud save failed.");
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Local Save
     const updated = [newApp, ...applications];
     saveApplications(updated);
-    
-    // Reset Form
     setCompanyName('');
     setRoleTitle('');
     setJobDescription('');
     setShowAddForm(false);
   };
 
-  const handleDeleteApplication = (id: string, e: React.MouseEvent) => {
+  const handleDeleteApplication = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid triggering card selection click
     const confirmMsg = language === 'fr' 
       ? "Supprimer définitivement cette candidature ?" 
       : "Are you sure you want to delete this application?";
     if (!window.confirm(confirmMsg)) return;
 
+    if (isCloud) {
+      setIsLoading(true);
+      try {
+        await apiService.deleteApplication(id);
+        setApplications(applications.filter(app => app.id !== id));
+      } catch (err) {
+        alert(language === 'fr' ? "Échec de la suppression Cloud." : "Cloud deletion failed.");
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Local Delete
     const updated = applications.filter(app => app.id !== id);
     saveApplications(updated);
   };
@@ -109,16 +162,29 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (Array.isArray(parsed)) {
           const confirmMsg = language === 'fr'
-            ? "Importer ces candidatures ? Cela remplacera votre liste locale actuelle."
-            : "Import applications? This will replace your current local list.";
+            ? "Importer ces candidatures ? Cela écrasera votre liste actuelle."
+            : "Import applications? This will overwrite your current list.";
           if (!window.confirm(confirmMsg)) return;
 
-          saveApplications(parsed);
+          if (isCloud) {
+            setIsLoading(true);
+            try {
+              await apiService.syncApplications(parsed);
+              const cloudApps = await apiService.fetchApplications();
+              setApplications(cloudApps);
+            } catch (err) {
+              alert(language === 'fr' ? "Erreur de synchronisation Cloud." : "Cloud sync failed.");
+            } finally {
+              setIsLoading(false);
+            }
+          } else {
+            saveApplications(parsed);
+          }
         } else {
           alert(language === 'fr' ? "Format JSON invalide. Doit être un tableau." : "Invalid JSON format. Must be an array.");
         }
@@ -127,7 +193,7 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
       }
     };
     reader.readAsText(file);
-    e.target.value = ''; // Reset input uploader uploader
+    e.target.value = ''; // Reset input uploader
   };
 
   const isFrench = language === 'fr';
@@ -148,7 +214,8 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
         <div className="flex gap-2">
           <button 
             onClick={handleExportData}
-            className="flex items-center gap-1 text-[10px] bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 font-bold transition cursor-pointer"
+            disabled={isLoading}
+            className="flex items-center gap-1 text-[10px] bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 font-bold transition cursor-pointer disabled:opacity-50"
             title={isFrench ? "Exporter en JSON" : "Export to JSON"}
           >
             <Download size={12} />
@@ -157,17 +224,35 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
           <label className="flex items-center gap-1 text-[10px] bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 font-bold transition cursor-pointer">
             <Upload size={12} />
             {isFrench ? 'Importer' : 'Import'}
-            <input type="file" accept=".json" onChange={handleImportData} className="hidden" />
+            <input type="file" accept=".json" onChange={handleImportData} className="hidden" disabled={isLoading} />
           </label>
         </div>
-        
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm transition cursor-pointer"
-        >
-          <Plus size={14} />
-          {isFrench ? 'Nouvelle Candidature' : 'New Application'}
-        </button>
+
+        <div className="flex items-center gap-2">
+          {isLoading && <Loader2 size={14} className="animate-spin text-indigo-500" />}
+          <div className="text-[10px] flex items-center gap-1 text-gray-400 font-semibold border border-gray-100 dark:border-gray-800 px-2.5 py-1 rounded-full">
+            {isCloud ? (
+              <>
+                <Cloud size={10} className="text-emerald-500" />
+                <span>Cloud</span>
+              </>
+            ) : (
+              <>
+                <Database size={10} className="text-gray-400" />
+                <span>Local</span>
+              </>
+            )}
+          </div>
+          
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            disabled={isLoading}
+            className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-full text-xs font-bold shadow-sm transition cursor-pointer disabled:opacity-50"
+          >
+            <Plus size={14} />
+            {isFrench ? 'Nouvelle Candidature' : 'New Application'}
+          </button>
+        </div>
       </div>
 
       {/* Quick Add Application Form */}
@@ -198,7 +283,7 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
             </div>
           </div>
           <div>
-              <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{isFrench ? 'DESCRIPTION DE POSTE' : 'JOB DESCRIPTION'}</label>
+            <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{isFrench ? 'DESCRIPTION DE POSTE' : 'JOB DESCRIPTION'}</label>
             <textarea 
               value={jobDescription}
               onChange={(e) => setJobDescription(e.target.value)}
@@ -242,7 +327,7 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
         <select 
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="p-2 text-xs border border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 rounded-lg focus:border-indigo-500 shadow-sm"
+          className="p-2 text-xs border border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 rounded-lg focus:border-indigo-500 shadow-sm animate-fade-in"
         >
           <option value="all">{isFrench ? 'Tous les statuts' : 'All Status'}</option>
           <option value="draft">{isFrench ? 'Brouillon' : 'Draft'}</option>
@@ -256,14 +341,14 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
       {/* Applications list */}
       <div className="space-y-3">
         {filteredApps.length === 0 ? (
-          <div className="text-center py-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-gray-400 italic">
+          <div className="text-center py-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-gray-400 italic transition-colors">
             <Briefcase size={36} className="mx-auto text-gray-300 dark:text-gray-700 mb-2" />
             {isFrench ? 'Aucune candidature trouvée.' : 'No applications found.'}
           </div>
         ) : (
           filteredApps.map(app => {
-            const stepsCount = app.interviewSteps.length;
-            const completedSteps = app.interviewSteps.filter(s => s.status === 'completed').length;
+            const stepsCount = app.interviewSteps?.length || 0;
+            const completedSteps = app.interviewSteps?.filter(s => s.status === 'completed').length || 0;
             
             return (
               <div
@@ -298,7 +383,8 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
                   
                   <button
                     onClick={(e) => handleDeleteApplication(app.id, e)}
-                    className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded transition"
+                    disabled={isLoading}
+                    className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded transition disabled:opacity-50"
                     title={isFrench ? "Supprimer la candidature" : "Delete application"}
                   >
                     <Trash2 size={13} />

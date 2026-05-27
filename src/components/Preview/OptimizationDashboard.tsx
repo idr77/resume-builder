@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ResumeData } from '../../types/resume';
 import type { OptimizationResult } from '../../utils/atsOptimizer';
 import { extractKeywordsWithGemini } from '../../utils/geminiApiService';
+import { apiService } from '../../utils/apiService';
 import { CheckCircle, AlertTriangle, XCircle, ChevronDown, ChevronUp, Sparkles, UserCheck, ShieldAlert, BadgeCheck } from 'lucide-react';
 
 interface Props {
@@ -18,16 +19,39 @@ export default function OptimizationDashboard({ data, onChange, result, setAiKey
 
   const handleExtractKeywords = async () => {
     try {
+      const online = await apiService.checkHealth();
+      const isCloudConnected = online && apiService.isLoggedIn();
       const apiKey = localStorage.getItem('gemini_api_key');
-      if (!apiKey) {
-        alert(lang === 'fr' ? "Clé API Gemini manquante. Allez dans les paramètres." : "Missing Gemini API Key. Go to Settings.");
+      
+      if (!apiKey && !isCloudConnected) {
+        alert(lang === 'fr' 
+          ? "Clé API Gemini manquante. Allez dans les paramètres ou connectez-vous au Cloud." 
+          : "Missing Gemini API Key. Go to Settings or connect to Cloud.");
         return;
       }
+      
       setIsExtracting(true);
-      const keywords = await extractKeywordsWithGemini(apiKey, data.targetJobDescription || '', lang);
+      let keywords: string[] = [];
+
+      if (isCloudConnected) {
+        // Secure call proxied through AI Gateway
+        const systemPrompt = "Vous êtes un expert en recrutement ATS.";
+        const userPrompt = `Analysez la description de poste ci-dessous et extrayez une liste de mots-clés techniques, technologiques et soft skills essentiels pour passer les filtres ATS. Retournez la réponse UNIQUEMENT sous forme de tableau de chaînes JSON brut, sans formatage markdown (ex: ["React", "Python", "Gestion de projet"]).
+Description de poste : ${data.targetJobDescription}`;
+        
+        let response = await apiService.proxyLlm(systemPrompt, userPrompt, 'GEMINI');
+        if (response.startsWith('```')) {
+          response = response.replace(/^```json\n?|```$/g, '').trim();
+        }
+        keywords = JSON.parse(response);
+      } else {
+        // Fallback to direct client
+        keywords = await extractKeywordsWithGemini(apiKey!, data.targetJobDescription || '', lang);
+      }
+
       setAiKeywords(keywords);
     } catch (e) {
-      alert(lang === 'fr' ? "Échec de l'extraction." : "Extraction failed.");
+      alert(lang === 'fr' ? "Échec de l'extraction des mots-clés." : "Extraction failed.");
     } finally {
       setIsExtracting(false);
     }
@@ -77,42 +101,42 @@ export default function OptimizationDashboard({ data, onChange, result, setAiKey
         <div className="col-span-2 flex gap-4">
           <div className="flex flex-col items-center justify-center p-2 min-w-[90px] bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/40 dark:to-blue-950/30 rounded-lg border border-indigo-100/50 dark:border-indigo-900/50">
              <div className="text-3xl font-bold text-indigo-800 dark:text-indigo-300">
-               {result.matchScore}%
+                {result.matchScore}%
              </div>
              <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider whitespace-nowrap mt-1">Match Score</div>
           </div>
           
           <div className="flex-1 space-y-2 overflow-y-auto h-24 pr-2 scrollbar-thin">
              {result.targetKeywords.length === 0 ? (
-               <p className="text-xs text-gray-400 dark:text-gray-500 italic mt-4">
-                 {isFrench ? 'Collez la description pour voir les mots-clés.' : 'Paste a JD to analyze keywords.'}
-               </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 italic mt-4">
+                  {isFrench ? 'Collez la description pour voir les mots-clés.' : 'Paste a JD to analyze keywords.'}
+                </p>
              ) : (
-               <>
-                 <div>
-                   <span className="text-[9px] font-bold text-red-500 dark:text-red-400 uppercase tracking-wider mb-1 block">
-                     {isFrench ? 'Manquants' : 'Missing'} ({result.missingKeywords.length})
-                   </span>
-                   <div className="flex flex-wrap gap-1">
-                     {result.missingKeywords.length === 0 && <span className="text-xs text-green-600 dark:text-green-400">None! 🎉</span>}
-                     {result.missingKeywords.map(k => (
-                       <span key={k} className="px-2 py-0.5 text-[9px] font-medium bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-150 dark:border-red-800 rounded-full">{k}</span>
-                     ))}
-                   </div>
-                 </div>
-                 
-                 <div>
-                   <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1 block mt-2">
-                     {isFrench ? 'Trouvés' : 'Found'} ({result.foundKeywords.length})
-                   </span>
-                   <div className="flex flex-wrap gap-1">
-                     {result.foundKeywords.length === 0 && <span className="text-xs text-gray-400 dark:text-gray-500">None yet.</span>}
-                     {result.foundKeywords.map(k => (
-                       <span key={k} className="px-2 py-0.5 text-[9px] font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-150 dark:border-emerald-800 rounded-full">{k}</span>
-                     ))}
-                   </div>
-                 </div>
-               </>
+                <>
+                  <div>
+                    <span className="text-[9px] font-bold text-red-500 dark:text-red-400 uppercase tracking-wider mb-1 block">
+                      {isFrench ? 'Manquants' : 'Missing'} ({result.missingKeywords.length})
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {result.missingKeywords.length === 0 && <span className="text-xs text-green-600 dark:text-green-400">None! 🎉</span>}
+                      {result.missingKeywords.map(k => (
+                        <span key={k} className="px-2 py-0.5 text-[9px] font-medium bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-150 dark:border-red-800 rounded-full">{k}</span>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1 block mt-2">
+                      {isFrench ? 'Trouvés' : 'Found'} ({result.foundKeywords.length})
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {result.foundKeywords.length === 0 && <span className="text-xs text-gray-400 dark:text-gray-500">None yet.</span>}
+                      {result.foundKeywords.map(k => (
+                        <span key={k} className="px-2 py-0.5 text-[9px] font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-150 dark:border-emerald-800 rounded-full">{k}</span>
+                      ))}
+                    </div>
+                  </div>
+                </>
              )}
           </div>
         </div>

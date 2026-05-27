@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import type { ResumeData } from '../../types/resume';
-import { Save, FolderOpen, Copy, Trash2, Database, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, FolderOpen, Copy, Trash2, Database, ChevronDown, ChevronUp, Cloud } from 'lucide-react';
 import { compressImage } from '../../utils/imageCompressor';
+import { apiService, type SavedVersion } from '../../utils/apiService';
 
 interface Props {
   data: ResumeData;
@@ -9,18 +10,13 @@ interface Props {
   language: 'en' | 'fr';
 }
 
-interface SavedVersion {
-  id: string;
-  name: string;
-  updatedAt: string;
-  data: ResumeData;
-}
-
 export default function VersionManager({ data, onLoad, language }: Props) {
   const [versions, setVersions] = useState<SavedVersion[]>([]);
   const [newVersionName, setNewVersionName] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
   const [message, setMessage] = useState('');
+  const [isCloud, setIsCloud] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Safe wrapper for localStorage.setItem to handle quota errors
   const safeSetLocalStorage = (key: string, value: string): boolean => {
@@ -69,13 +65,29 @@ export default function VersionManager({ data, onLoad, language }: Props) {
     }
   };
 
-  // Load versions from localStorage on mount and run background photo migrations
+  // Load versions on mount
   useEffect(() => {
-    loadVersionsFromStorage();
+    loadVersions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadVersionsFromStorage = () => {
+  const loadVersions = async () => {
+    setIsLoading(true);
+    try {
+      const online = await apiService.checkHealth();
+      if (online && apiService.isLoggedIn()) {
+        const cloudVersions = await apiService.fetchVersions();
+        setVersions(cloudVersions);
+        setIsCloud(true);
+        setIsLoading(false);
+        return;
+      }
+    } catch (e) {
+      console.warn('Backend server offline or unauthenticated. Falling back to local storage.', e);
+    }
+
+    // Fallback to Local Storage
+    setIsCloud(false);
     try {
       const stored = localStorage.getItem('ats_resumes_history');
       if (stored) {
@@ -95,7 +107,9 @@ export default function VersionManager({ data, onLoad, language }: Props) {
         setVersions([initial]);
       }
     } catch (e) {
-      console.error('Error loading versions', e);
+      console.error('Error loading local versions', e);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -147,31 +161,50 @@ export default function VersionManager({ data, onLoad, language }: Props) {
     return initialVersion ? [initialVersion, ...keptOthers] : keptOthers;
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVersionName.trim()) return;
 
+    const targetData = {
+      ...data,
+      styleSettings: data.styleSettings || {
+        template: 'classic',
+        themeColor: 'slate',
+        fontFamily: 'Helvetica',
+        fontSize: 'medium'
+      }
+    };
+
+    if (isCloud) {
+      setIsLoading(true);
+      try {
+        await apiService.saveVersion(newVersionName.trim(), targetData);
+        // Refresh version list
+        const cloudVersions = await apiService.fetchVersions();
+        setVersions(cloudVersions);
+        setNewVersionName('');
+        showNotification(language === 'fr' ? 'Version sauvegardée sur le Cloud !' : 'Version saved to Cloud DB!');
+      } catch (err: any) {
+        showNotification(language === 'fr' ? 'Erreur de sauvegarde Cloud' : 'Cloud save failed');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Local Storage Save
     const newVersion: SavedVersion = {
       id: Date.now().toString(),
       name: newVersionName.trim(),
       updatedAt: new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
-      data: {
-        ...data,
-        // Set styleSettings defaults if missing
-        styleSettings: data.styleSettings || {
-          template: 'classic',
-          themeColor: 'slate',
-          fontFamily: 'Helvetica',
-          fontSize: 'medium'
-        }
-      }
+      data: targetData
     };
 
     const updated = pruneHistoryList([newVersion, ...versions.filter(v => v.name !== newVersion.name)]);
     if (safeSetLocalStorage('ats_resumes_history', JSON.stringify(updated))) {
       setVersions(updated);
       setNewVersionName('');
-      showNotification(language === 'fr' ? 'Version sauvegardée !' : 'Version saved successfully!');
+      showNotification(language === 'fr' ? 'Version sauvegardée localement !' : 'Version saved locally!');
     }
   };
 
@@ -180,21 +213,39 @@ export default function VersionManager({ data, onLoad, language }: Props) {
     showNotification(language === 'fr' ? `Version "${version.name}" chargée !` : `Loaded "${version.name}"!`);
   };
 
-  const handleDuplicate = (version: SavedVersion) => {
+  const handleDuplicate = async (version: SavedVersion) => {
+    const duplicatedName = `${version.name} (${language === 'fr' ? 'Copie' : 'Copy'})`;
+
+    if (isCloud) {
+      setIsLoading(true);
+      try {
+        await apiService.saveVersion(duplicatedName, version.data);
+        const cloudVersions = await apiService.fetchVersions();
+        setVersions(cloudVersions);
+        showNotification(language === 'fr' ? 'Version dupliquée sur le Cloud !' : 'Version duplicated on Cloud!');
+      } catch (err) {
+        showNotification(language === 'fr' ? 'Échec de duplication Cloud' : 'Cloud duplication failed');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Local Storage Duplicate
     const duplicated: SavedVersion = {
       id: Date.now().toString(),
-      name: `${version.name} (${language === 'fr' ? 'Copie' : 'Copy'})`,
+      name: duplicatedName,
       updatedAt: new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
       data: version.data
     };
     const updated = pruneHistoryList([duplicated, ...versions]);
     if (safeSetLocalStorage('ats_resumes_history', JSON.stringify(updated))) {
       setVersions(updated);
-      showNotification(language === 'fr' ? 'Version dupliquée !' : 'Version duplicated!');
+      showNotification(language === 'fr' ? 'Version dupliquée localement !' : 'Version duplicated locally!');
     }
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (id === 'initial') {
       alert(language === 'fr' ? "Impossible de supprimer la version initiale." : "Cannot delete the initial version.");
       return;
@@ -204,10 +255,27 @@ export default function VersionManager({ data, onLoad, language }: Props) {
       : `Are you sure you want to delete "${name}"?`;
     if (!window.confirm(confirmMsg)) return;
 
+    if (isCloud) {
+      setIsLoading(true);
+      try {
+        const success = await apiService.deleteVersion(id);
+        if (success) {
+          setVersions(versions.filter(v => v.id !== id));
+          showNotification(language === 'fr' ? 'Version supprimée du Cloud.' : 'Version deleted from Cloud.');
+        }
+      } catch (err) {
+        showNotification(language === 'fr' ? 'Échec de suppression Cloud' : 'Cloud deletion failed');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Local Storage Delete
     const updated = versions.filter(v => v.id !== id);
     if (safeSetLocalStorage('ats_resumes_history', JSON.stringify(updated))) {
       setVersions(updated);
-      showNotification(language === 'fr' ? 'Version supprimée.' : 'Version deleted.');
+      showNotification(language === 'fr' ? 'Version locale supprimée.' : 'Local version deleted.');
     }
   };
 
@@ -225,8 +293,16 @@ export default function VersionManager({ data, onLoad, language }: Props) {
         className="w-full flex items-center justify-between p-4 font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition cursor-pointer"
       >
         <div className="flex items-center gap-2">
-          <Database size={18} className="text-indigo-500 dark:text-indigo-400" />
-          <span>{isFrench ? 'Gestionnaire de Versions (Sauvegarde locale)' : 'Version Manager (Local Storage)'}</span>
+          {isCloud ? (
+            <Cloud size={18} className="text-emerald-500 dark:text-emerald-400 animate-pulse" />
+          ) : (
+            <Database size={18} className="text-indigo-500 dark:text-indigo-400" />
+          )}
+          <span>
+            {isCloud 
+              ? (isFrench ? 'Gestionnaire de Versions (Synchronisé Cloud)' : 'Version Manager (Cloud Synced)')
+              : (isFrench ? 'Gestionnaire de Versions (Sauvegarde locale)' : 'Version Manager (Local Storage)')}
+          </span>
         </div>
         {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
       </button>
@@ -249,10 +325,12 @@ export default function VersionManager({ data, onLoad, language }: Props) {
               className="flex-1 p-2 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
               maxLength={40}
               required
+              disabled={isLoading}
             />
             <button 
               type="submit"
-              className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+              disabled={isLoading}
+              className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
             >
               <Save size={14} />
               {isFrench ? 'Sauver' : 'Save'}
@@ -274,14 +352,16 @@ export default function VersionManager({ data, onLoad, language }: Props) {
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button 
                     onClick={() => handleLoad(v)}
-                    className="p-1 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:text-blue-800 rounded transition-colors cursor-pointer"
+                    disabled={isLoading}
+                    className="p-1 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:text-blue-800 rounded transition-colors cursor-pointer disabled:opacity-50"
                     title={isFrench ? 'Charger cette version' : 'Load this version'}
                   >
                     <FolderOpen size={14} />
                   </button>
                   <button 
                     onClick={() => handleDuplicate(v)}
-                    className="p-1 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 rounded transition-colors cursor-pointer"
+                    disabled={isLoading}
+                    className="p-1 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 rounded transition-colors cursor-pointer disabled:opacity-50"
                     title={isFrench ? 'Dupliquer' : 'Duplicate'}
                   >
                     <Copy size={14} />
@@ -289,7 +369,8 @@ export default function VersionManager({ data, onLoad, language }: Props) {
                   {v.id !== 'initial' && (
                     <button 
                       onClick={() => handleDelete(v.id, v.name)}
-                      className="p-1 hover:bg-red-50 dark:hover:bg-red-950/45 text-red-500 dark:text-red-400 hover:text-red-700 rounded transition-colors cursor-pointer"
+                      disabled={isLoading}
+                      className="p-1 hover:bg-red-50 dark:hover:bg-red-950/45 text-red-500 dark:text-red-400 hover:text-red-700 rounded transition-colors cursor-pointer disabled:opacity-50"
                       title={isFrench ? 'Supprimer' : 'Delete'}
                     >
                       <Trash2 size={14} />

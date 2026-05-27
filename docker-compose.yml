@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: ats_postgres
+    environment:
+      POSTGRES_USER: ats_user
+      POSTGRES_PASSWORD: ats_secure_password
+      POSTGRES_DB: ats_resumes
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - ats_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ats_user -d ats_resumes"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    container_name: ats_backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ats_resumes
+      SPRING_DATASOURCE_USERNAME: ats_user
+      SPRING_DATASOURCE_PASSWORD: ats_secure_password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      AES_MASTER_KEY: ${AES_MASTER_KEY:-MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ats_network
+
+volumes:
+  pgdata:
+
+networks:
+  ats_network:
+    driver: bridge
