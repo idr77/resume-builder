@@ -21,6 +21,8 @@ import { apiService } from './utils/apiService';
 function App() {
   const [resumeData, setResumeData] = useState<ResumeData>(initialResumeState);
   const [debouncedResumeData, setDebouncedResumeData] = useState<ResumeData>(initialResumeState);
+  const [activeVersion, setActiveVersion] = useState<{ id: string; name: string } | null>(null);
+  const [cvSaveStatus, setCvSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [showImportOpen, setShowImportOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -54,6 +56,7 @@ function App() {
             console.log("Loading latest resume version from cloud DB on mount...");
             setResumeData(cloudVersions[0].data);
             setDebouncedResumeData(cloudVersions[0].data);
+            setActiveVersion({ id: cloudVersions[0].id, name: cloudVersions[0].name });
             return;
           }
         }
@@ -65,19 +68,67 @@ function App() {
       try {
         const localHistoryStr = localStorage.getItem('ats_resumes_history');
         if (localHistoryStr) {
-          const localHistory = JSON.parse(localHistoryStr) as { id: string; data: ResumeData }[];
+          const localHistory = JSON.parse(localHistoryStr) as { id: string; name: string; data: ResumeData }[];
           if (localHistory.length > 0) {
             console.log("Loading latest resume version from localStorage history on mount...");
             setResumeData(localHistory[0].data);
             setDebouncedResumeData(localHistory[0].data);
+            setActiveVersion({ id: localHistory[0].id, name: localHistory[0].name });
+            return;
           }
         }
       } catch (err) {
         console.error("Failed to parse local resume history on mount", err);
       }
+
+      // Default fallback
+      setActiveVersion({ id: 'initial', name: resumeData.language === 'fr' ? 'Version Initiale' : 'Initial Version' });
     };
     initializeData();
   }, []);
+
+  // Auto-save CV to active version
+  useEffect(() => {
+    if (!activeVersion) return;
+    
+    // Check if the data is actually different from initialResumeState before writing
+    if (JSON.stringify(debouncedResumeData) === JSON.stringify(initialResumeState)) return;
+
+    const saveActive = async () => {
+      setCvSaveStatus('saving');
+      try {
+        const online = await apiService.checkHealth();
+        if (online && apiService.isLoggedIn()) {
+          await apiService.saveVersion(activeVersion.name, debouncedResumeData);
+          setCvSaveStatus('saved');
+        } else {
+          // Local storage overwrite
+          const stored = localStorage.getItem('ats_resumes_history');
+          if (stored) {
+            const history = JSON.parse(stored) as any[];
+            const updated = history.map((v: any) => {
+              if (v.id === activeVersion.id) {
+                return { 
+                  ...v, 
+                  data: debouncedResumeData,
+                  updatedAt: new Date().toLocaleDateString(resumeData.language === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+                };
+              }
+              return v;
+            });
+            localStorage.setItem('ats_resumes_history', JSON.stringify(updated));
+            setCvSaveStatus('saved');
+          }
+        }
+      } catch (err) {
+        console.error("Auto-save failed", err);
+        setCvSaveStatus('error');
+      }
+      setTimeout(() => setCvSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 3000);
+    };
+
+    saveActive();
+  }, [debouncedResumeData, activeVersion]);
 
   // Debounce resumeData changes for heavy PDF generation to prevent input lag
   useEffect(() => {
@@ -379,7 +430,13 @@ function App() {
                   </button>
                 </div>
               </div>
-              <ResumeForm data={resumeData} onChange={setResumeData} missingKeywords={atsResult.missingKeywords} />
+              <ResumeForm 
+                data={resumeData} 
+                onChange={setResumeData} 
+                missingKeywords={atsResult.missingKeywords} 
+                activeVersion={activeVersion}
+                setActiveVersion={setActiveVersion}
+              />
             </>
           )}
         </main>
@@ -409,6 +466,21 @@ function App() {
               <span className="flex items-center gap-1.5 text-[10px] text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1 rounded-full font-medium border border-indigo-100 dark:border-indigo-900/50 animate-pulse transition-all">
                 <Loader2 size={11} className="animate-spin text-indigo-500 dark:text-indigo-400" />
                 <span>{resumeData.language === 'fr' ? 'Synchronisation...' : 'Syncing...'}</span>
+              </span>
+            )}
+            {cvSaveStatus !== 'idle' && (
+              <span className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-semibold transition-all border ${
+                cvSaveStatus === 'saving' 
+                  ? 'text-amber-600 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/60 animate-pulse'
+                  : cvSaveStatus === 'saved'
+                  ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/60'
+                  : 'text-red-600 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/60'
+              }`}>
+                <span>
+                  {cvSaveStatus === 'saving' && (resumeData.language === 'fr' ? 'Enregistrement...' : 'Saving...')}
+                  {cvSaveStatus === 'saved' && (resumeData.language === 'fr' ? 'Enregistré' : 'Saved')}
+                  {cvSaveStatus === 'error' && (resumeData.language === 'fr' ? 'Erreur' : 'Error')}
+                </span>
               </span>
             )}
           </div>

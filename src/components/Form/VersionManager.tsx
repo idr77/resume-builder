@@ -8,9 +8,11 @@ interface Props {
   data: ResumeData;
   onLoad: (loadedData: ResumeData) => void;
   language: 'en' | 'fr';
+  activeVersion: { id: string; name: string } | null;
+  setActiveVersion: (ver: { id: string; name: string } | null) => void;
 }
 
-export default function VersionManager({ data, onLoad, language }: Props) {
+export default function VersionManager({ data, onLoad, language, activeVersion, setActiveVersion }: Props) {
   const [versions, setVersions] = useState<SavedVersion[]>([]);
   const [newVersionName, setNewVersionName] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
@@ -79,6 +81,9 @@ export default function VersionManager({ data, onLoad, language }: Props) {
         const cloudVersions = await apiService.fetchVersions();
         setVersions(cloudVersions);
         setIsCloud(true);
+        if (!activeVersion && cloudVersions.length > 0) {
+          setActiveVersion({ id: cloudVersions[0].id, name: cloudVersions[0].name });
+        }
         setIsLoading(false);
         return;
       }
@@ -93,6 +98,9 @@ export default function VersionManager({ data, onLoad, language }: Props) {
       if (stored) {
         const parsed = JSON.parse(stored) as SavedVersion[];
         setVersions(parsed);
+        if (!activeVersion && parsed.length > 0) {
+          setActiveVersion({ id: parsed[0].id, name: parsed[0].name });
+        }
         // Run migration in background to compress any huge legacy base64 photos
         runBackgroundMigration(parsed);
       } else {
@@ -105,6 +113,9 @@ export default function VersionManager({ data, onLoad, language }: Props) {
         };
         safeSetLocalStorage('ats_resumes_history', JSON.stringify([initial]));
         setVersions([initial]);
+        if (!activeVersion) {
+          setActiveVersion({ id: 'initial', name: initial.name });
+        }
       }
     } catch (e) {
       console.error('Error loading local versions', e);
@@ -161,6 +172,47 @@ export default function VersionManager({ data, onLoad, language }: Props) {
     return initialVersion ? [initialVersion, ...keptOthers] : keptOthers;
   };
 
+  const handleManualUpdate = async () => {
+    if (!activeVersion) return;
+    setIsLoading(true);
+    const targetData = {
+      ...data,
+      styleSettings: data.styleSettings || {
+        template: 'classic',
+        themeColor: 'slate',
+        fontFamily: 'Helvetica',
+        fontSize: 'medium'
+      }
+    };
+
+    try {
+      if (isCloud) {
+        await apiService.saveVersion(activeVersion.name, targetData);
+        // Refresh version list
+        const cloudVersions = await apiService.fetchVersions();
+        setVersions(cloudVersions);
+        showNotification(language === 'fr' ? 'Version active mise à jour sur le Cloud !' : 'Active version updated on Cloud!');
+      } else {
+        const stored = localStorage.getItem('ats_resumes_history');
+        if (stored) {
+          const parsed = JSON.parse(stored) as SavedVersion[];
+          const updated = parsed.map(v => v.id === activeVersion.id ? { 
+            ...v, 
+            data: targetData,
+            updatedAt: new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+          } : v);
+          safeSetLocalStorage('ats_resumes_history', JSON.stringify(updated));
+          setVersions(updated);
+          showNotification(language === 'fr' ? 'Version active mise à jour localement !' : 'Active version updated locally!');
+        }
+      }
+    } catch (err) {
+      showNotification(language === 'fr' ? 'Échec de la mise à jour' : 'Update failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVersionName.trim()) return;
@@ -178,12 +230,18 @@ export default function VersionManager({ data, onLoad, language }: Props) {
     if (isCloud) {
       setIsLoading(true);
       try {
-        await apiService.saveVersion(newVersionName.trim(), targetData);
+        const saved = await apiService.saveVersion(newVersionName.trim(), targetData);
         // Refresh version list
         const cloudVersions = await apiService.fetchVersions();
         setVersions(cloudVersions);
+        const matched = cloudVersions.find(v => v.name === newVersionName.trim());
+        if (matched) {
+          setActiveVersion({ id: matched.id, name: matched.name });
+        } else {
+          setActiveVersion({ id: saved.id, name: saved.name });
+        }
         setNewVersionName('');
-        showNotification(language === 'fr' ? 'Version sauvegardée sur le Cloud !' : 'Version saved to Cloud DB!');
+        showNotification(language === 'fr' ? 'Nouvelle version sauvegardée sur le Cloud !' : 'New version saved to Cloud!');
       } catch (err: any) {
         showNotification(language === 'fr' ? 'Erreur de sauvegarde Cloud' : 'Cloud save failed');
       } finally {
@@ -203,13 +261,15 @@ export default function VersionManager({ data, onLoad, language }: Props) {
     const updated = pruneHistoryList([newVersion, ...versions.filter(v => v.name !== newVersion.name)]);
     if (safeSetLocalStorage('ats_resumes_history', JSON.stringify(updated))) {
       setVersions(updated);
+      setActiveVersion({ id: newVersion.id, name: newVersion.name });
       setNewVersionName('');
-      showNotification(language === 'fr' ? 'Version sauvegardée localement !' : 'Version saved locally!');
+      showNotification(language === 'fr' ? 'Nouvelle version sauvegardée localement !' : 'New version saved locally!');
     }
   };
 
   const handleLoad = (version: SavedVersion) => {
     onLoad(version.data);
+    setActiveVersion({ id: version.id, name: version.name });
     showNotification(language === 'fr' ? `Version "${version.name}" chargée !` : `Loaded "${version.name}"!`);
   };
 
@@ -219,9 +279,15 @@ export default function VersionManager({ data, onLoad, language }: Props) {
     if (isCloud) {
       setIsLoading(true);
       try {
-        await apiService.saveVersion(duplicatedName, version.data);
+        const saved = await apiService.saveVersion(duplicatedName, version.data);
         const cloudVersions = await apiService.fetchVersions();
         setVersions(cloudVersions);
+        const matched = cloudVersions.find(v => v.name === duplicatedName);
+        if (matched) {
+          setActiveVersion({ id: matched.id, name: matched.name });
+        } else {
+          setActiveVersion({ id: saved.id, name: saved.name });
+        }
         showNotification(language === 'fr' ? 'Version dupliquée sur le Cloud !' : 'Version duplicated on Cloud!');
       } catch (err) {
         showNotification(language === 'fr' ? 'Échec de duplication Cloud' : 'Cloud duplication failed');
@@ -241,6 +307,7 @@ export default function VersionManager({ data, onLoad, language }: Props) {
     const updated = pruneHistoryList([duplicated, ...versions]);
     if (safeSetLocalStorage('ats_resumes_history', JSON.stringify(updated))) {
       setVersions(updated);
+      setActiveVersion({ id: duplicated.id, name: duplicated.name });
       showNotification(language === 'fr' ? 'Version dupliquée localement !' : 'Version duplicated locally!');
     }
   };
@@ -255,12 +322,18 @@ export default function VersionManager({ data, onLoad, language }: Props) {
       : `Are you sure you want to delete "${name}"?`;
     if (!window.confirm(confirmMsg)) return;
 
+    const remainingVersions = versions.filter(v => v.id !== id);
+
     if (isCloud) {
       setIsLoading(true);
       try {
         const success = await apiService.deleteVersion(id);
         if (success) {
-          setVersions(versions.filter(v => v.id !== id));
+          setVersions(remainingVersions);
+          if (activeVersion?.id === id && remainingVersions.length > 0) {
+            setActiveVersion({ id: remainingVersions[0].id, name: remainingVersions[0].name });
+            onLoad(remainingVersions[0].data);
+          }
           showNotification(language === 'fr' ? 'Version supprimée du Cloud.' : 'Version deleted from Cloud.');
         }
       } catch (err) {
@@ -272,9 +345,12 @@ export default function VersionManager({ data, onLoad, language }: Props) {
     }
 
     // Local Storage Delete
-    const updated = versions.filter(v => v.id !== id);
-    if (safeSetLocalStorage('ats_resumes_history', JSON.stringify(updated))) {
-      setVersions(updated);
+    if (safeSetLocalStorage('ats_resumes_history', JSON.stringify(remainingVersions))) {
+      setVersions(remainingVersions);
+      if (activeVersion?.id === id && remainingVersions.length > 0) {
+        setActiveVersion({ id: remainingVersions[0].id, name: remainingVersions[0].name });
+        onLoad(remainingVersions[0].data);
+      }
       showNotification(language === 'fr' ? 'Version locale supprimée.' : 'Local version deleted.');
     }
   };
@@ -312,6 +388,24 @@ export default function VersionManager({ data, onLoad, language }: Props) {
           {message && (
             <div className="p-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/50 rounded text-xs text-center animate-fade-in font-medium">
               {message}
+            </div>
+          )}
+
+          {activeVersion && (
+            <div className="flex items-center justify-between p-3 bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100/80 dark:border-indigo-900/60 rounded-lg shadow-sm">
+              <div className="text-xs min-w-0 mr-2">
+                <span className="text-gray-500 dark:text-gray-400 font-medium">{isFrench ? "Version active : " : "Active version: "}</span>
+                <span className="font-bold text-indigo-700 dark:text-indigo-300 block sm:inline truncate">{activeVersion.name}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleManualUpdate}
+                disabled={isLoading}
+                className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold shadow-sm transition-all shrink-0 cursor-pointer disabled:opacity-50"
+              >
+                <Save size={13} />
+                {isFrench ? "Enregistrer" : "Save changes"}
+              </button>
             </div>
           )}
 

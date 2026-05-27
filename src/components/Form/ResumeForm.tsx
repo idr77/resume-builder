@@ -13,9 +13,11 @@ interface Props {
   data: ResumeData;
   onChange: (data: ResumeData) => void;
   missingKeywords?: string[];
+  activeVersion: { id: string; name: string } | null;
+  setActiveVersion: (ver: { id: string; name: string } | null) => void;
 }
 
-export default function ResumeForm({ data, onChange, missingKeywords = [] }: Props) {
+export default function ResumeForm({ data, onChange, missingKeywords = [], activeVersion, setActiveVersion }: Props) {
   const [openSection, setOpenSection] = useState<string | null>('personal');
   const [rewriteIndex, setRewriteIndex] = useState<string | null>(null);
   const [rewriteSkillsOpen, setRewriteSkillsOpen] = useState(false);
@@ -167,7 +169,13 @@ export default function ResumeForm({ data, onChange, missingKeywords = [] }: Pro
 
   return (
     <div className="space-y-4">
-      <VersionManager data={data} onLoad={onChange} language={data.language} />
+      <VersionManager 
+        data={data} 
+        onLoad={onChange} 
+        language={data.language} 
+        activeVersion={activeVersion}
+        setActiveVersion={setActiveVersion}
+      />
 
       <button 
         onClick={() => setGlobalOptimizeOpen(true)}

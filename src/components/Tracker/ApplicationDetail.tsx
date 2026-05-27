@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { JobApplication, InterviewStep, ApplicationStatus } from '../../types/tracker';
 import { generateInterviewPrepWithGemini } from '../../utils/geminiApiService';
 import { apiService } from '../../utils/apiService';
@@ -37,11 +37,80 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
   const [fileName, setFileName] = useState(application.skillsDossierFileName || '');
   const [dossierText, setDossierText] = useState(application.skillsDossierText || '');
 
+  // Local notes state for typing and save status
+  const [notesText, setNotesText] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
   const isFrench = language === 'fr';
 
+  // Timeline Step Notes syncing effect
+  useEffect(() => {
+    const step = (application.interviewSteps || []).find(s => s.id === activeStepId);
+    setNotesText(step ? step.notes || '' : '');
+  }, [activeStepId, application.interviewSteps]);
+
+  const saveAllPendingChanges = async (nextNotes = notesText, nextDossier = dossierText, nextJd = jdText, nextStatus = appStatus) => {
+    setSaveStatus('saving');
+    try {
+      const updatedSteps = (application.interviewSteps || []).map(s => {
+        if (s.id === activeStepId) {
+          return { ...s, notes: nextNotes };
+        }
+        return s;
+      });
+
+      const updatedApp: JobApplication = {
+        ...application,
+        status: nextStatus,
+        jobDescription: nextJd,
+        skillsDossierText: nextDossier,
+        skillsDossierFileName: fileName,
+        interviewSteps: updatedSteps
+      };
+
+      onUpdate(updatedApp);
+      setSaveStatus('saved');
+    } catch (err) {
+      console.error("Failed to save application changes", err);
+      setSaveStatus('error');
+    }
+    setTimeout(() => setSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 3000);
+  };
+
+  // Debounced Auto-save effect
+  useEffect(() => {
+    const step = (application.interviewSteps || []).find(s => s.id === activeStepId);
+    const currentNotes = step ? step.notes || '' : '';
+    
+    const hasNotesChanged = notesText !== currentNotes;
+    const hasDossierChanged = dossierText !== (application.skillsDossierText || '');
+    const hasJdChanged = jdText !== application.jobDescription;
+
+    if (!hasNotesChanged && !hasDossierChanged && !hasJdChanged) return;
+
+    const timer = setTimeout(() => {
+      console.log("Auto-saving application tracker modifications...");
+      saveAllPendingChanges(notesText, dossierText, jdText, appStatus);
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [notesText, dossierText, jdText]);
+
   const updateApplication = (fields: Partial<JobApplication>) => {
+    const updatedSteps = (application.interviewSteps || []).map(s => {
+      if (s.id === activeStepId) {
+        return { ...s, notes: notesText };
+      }
+      return s;
+    });
+
     const updated = {
       ...application,
+      status: appStatus,
+      jobDescription: jdText,
+      skillsDossierText: dossierText,
+      skillsDossierFileName: fileName,
+      interviewSteps: updatedSteps,
       ...fields
     };
     onUpdate(updated);
@@ -50,13 +119,10 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const nextStatus = e.target.value as ApplicationStatus;
     setAppStatus(nextStatus);
-    updateApplication({ status: nextStatus });
+    saveAllPendingChanges(notesText, dossierText, jdText, nextStatus);
   };
 
-  const handleJdUpdate = () => {
-    updateApplication({ jobDescription: jdText });
-    alert(isFrench ? "Description mise à jour !" : "Job description updated!");
-  };
+
 
   // Add Step to Recruitment Timeline
   const handleAddStep = (e: React.FormEvent) => {
@@ -99,7 +165,20 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
       }
       return s;
     });
-    updateApplication({ interviewSteps: updatedSteps });
+
+    if (key === 'notes' && stepId === activeStepId) {
+      setNotesText(value as string);
+    }
+
+    const updated = {
+      ...application,
+      status: appStatus,
+      jobDescription: jdText,
+      skillsDossierText: dossierText,
+      skillsDossierFileName: fileName,
+      interviewSteps: updatedSteps
+    };
+    onUpdate(updated);
   };
 
   // Skills Dossier Uploader
@@ -176,28 +255,54 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
   return (
     <div className="space-y-4 max-h-[calc(100vh-140px)] overflow-y-auto pr-1">
       {/* Back Header */}
-      <div className="flex justify-between items-center bg-white dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm transition-colors text-xs font-semibold">
+      <div className="flex justify-between items-center bg-white dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm transition-colors text-xs font-semibold flex-wrap gap-2">
         <button 
           onClick={onBack}
           className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-bold transition cursor-pointer"
         >
           <ArrowLeft size={16} />
-          {isFrench ? 'Retour aux candidatures' : 'Back to Tracker'}
+          {isFrench ? 'Retour' : 'Back'}
         </button>
 
-        <div className="flex items-center gap-2">
-          <span className="text-gray-500">{isFrench ? 'Statut :' : 'Status:'}</span>
-          <select 
-            value={appStatus}
-            onChange={handleStatusChange}
-            className="p-1 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:ring-1 focus:ring-indigo-500 bg-white cursor-pointer"
+        <div className="flex items-center gap-3">
+          {saveStatus !== 'idle' && (
+            <span className={`flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full font-bold border transition-all ${
+              saveStatus === 'saving'
+                ? 'text-amber-600 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/60 animate-pulse'
+                : saveStatus === 'saved'
+                ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/60'
+                : 'text-red-600 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/60'
+            }`}>
+              {saveStatus === 'saving' && (isFrench ? 'Enregistrement...' : 'Saving...')}
+              {saveStatus === 'saved' && (isFrench ? 'Enregistré' : 'Saved')}
+              {saveStatus === 'error' && (isFrench ? 'Erreur' : 'Error')}
+            </span>
+          )}
+
+          <button
+            type="button"
+            onClick={() => saveAllPendingChanges()}
+            disabled={saveStatus === 'saving'}
+            className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-[11px] font-bold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
           >
-            <option value="draft">{isFrench ? 'Brouillon' : 'Draft'}</option>
-            <option value="applied">{isFrench ? 'Candidaté' : 'Applied'}</option>
-            <option value="interviewing">{isFrench ? 'Entretien' : 'Interviewing'}</option>
-            <option value="offer">{isFrench ? 'Offre Reçue 🎉' : 'Offer Received 🎉'}</option>
-            <option value="rejected">{isFrench ? 'Refusé' : 'Rejected'}</option>
-          </select>
+            <Save size={13} />
+            {isFrench ? 'Enregistrer' : 'Save'}
+          </button>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-gray-500">{isFrench ? 'Statut :' : 'Status:'}</span>
+            <select 
+              value={appStatus}
+              onChange={handleStatusChange}
+              className="p-1 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:ring-1 focus:ring-indigo-500 bg-white cursor-pointer text-[11px]"
+            >
+              <option value="draft">{isFrench ? 'Brouillon' : 'Draft'}</option>
+              <option value="applied">{isFrench ? 'Candidaté' : 'Applied'}</option>
+              <option value="interviewing">{isFrench ? 'Entretien' : 'Interviewing'}</option>
+              <option value="offer">{isFrench ? 'Offre Reçue 🎉' : 'Offer Received 🎉'}</option>
+              <option value="rejected">{isFrench ? 'Refusé' : 'Rejected'}</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -298,7 +403,8 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
               <div className="relative">
                 <textarea
                   value={dossierText}
-                  onChange={(e) => { setDossierText(e.target.value); updateApplication({ skillsDossierText: e.target.value }); }}
+                  onChange={(e) => setDossierText(e.target.value)}
+                  onBlur={() => saveAllPendingChanges(notesText, dossierText, jdText, appStatus)}
                   className="w-full h-24 p-1.5 text-[10px] border border-gray-200 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 rounded resize-none"
                 />
                 <button
@@ -347,8 +453,9 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
                   <span className="text-[10px] text-gray-400 italic">Supports Markdown</span>
                 </div>
                 <textarea 
-                  value={activeStep.notes || ''}
-                  onChange={(e) => handleUpdateStepField(activeStep.id, 'notes', e.target.value)}
+                  value={notesText}
+                  onChange={(e) => setNotesText(e.target.value)}
+                  onBlur={() => saveAllPendingChanges(notesText, dossierText, jdText, appStatus)}
                   className="w-full h-32 p-3 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-sans resize-none transition-colors"
                   placeholder={isFrench ? "- Vos questions prévues...\n- Réponses du recruteur...\n- Salaire évoqué : 65k...\n- Feedback : positif" : "- Questions to prepare...\n- Interviewer answers...\n- Budget discuss: 65k...\n- Feedback: Positive"}
                 />
@@ -410,12 +517,13 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
             <textarea 
               value={jdText}
               onChange={(e) => setJdText(e.target.value)}
+              onBlur={() => saveAllPendingChanges(notesText, dossierText, jdText, appStatus)}
               className="w-full h-32 p-3 border border-gray-300 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 rounded resize-none transition-colors"
             />
             <div className="flex justify-end">
               <button 
                 type="button"
-                onClick={handleJdUpdate}
+                onClick={() => saveAllPendingChanges(notesText, dossierText, jdText, appStatus)}
                 className="flex items-center gap-1.5 bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-950 px-4 py-1.5 rounded text-xs font-bold hover:opacity-90 transition cursor-pointer"
               >
                 <Save size={13} />
