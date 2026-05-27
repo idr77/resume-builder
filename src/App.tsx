@@ -42,24 +42,41 @@ function App() {
     localStorage.setItem('app_theme', theme);
   }, [theme]);
 
-  // Cloud dynamic loading of the latest resume version on mount
+  // Load the latest resume version on mount (either from Postgres cloud DB or local localStorage fallback)
   useEffect(() => {
-    const loadLatestCloudResume = async () => {
+    const initializeData = async () => {
+      // 1. Try to load from Spring Boot Backend Cloud if online and logged in
       try {
         const online = await apiService.checkHealth();
         if (online && apiService.isLoggedIn()) {
           const cloudVersions = await apiService.fetchVersions();
           if (cloudVersions.length > 0) {
-            // Sort to ensure we take the absolute newest modified version
+            console.log("Loading latest resume version from cloud DB on mount...");
             setResumeData(cloudVersions[0].data);
             setDebouncedResumeData(cloudVersions[0].data);
+            return;
           }
         }
       } catch (err) {
-        console.warn("Failed to load cloud CV data on mount", err);
+        console.warn("Failed to load cloud CV data on mount, attempting local storage check", err);
+      }
+
+      // 2. Fallback: Load the latest version from local localStorage history if present
+      try {
+        const localHistoryStr = localStorage.getItem('ats_resumes_history');
+        if (localHistoryStr) {
+          const localHistory = JSON.parse(localHistoryStr) as { id: string; data: ResumeData }[];
+          if (localHistory.length > 0) {
+            console.log("Loading latest resume version from localStorage history on mount...");
+            setResumeData(localHistory[0].data);
+            setDebouncedResumeData(localHistory[0].data);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to parse local resume history on mount", err);
       }
     };
-    loadLatestCloudResume();
+    initializeData();
   }, []);
 
   // Debounce resumeData changes for heavy PDF generation to prevent input lag
