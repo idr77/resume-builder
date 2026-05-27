@@ -181,7 +181,7 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
           </button>
           
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-350 rounded bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
+            <button onClick={onClose} className="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 rounded bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer">
               {isFrench ? 'Annuler' : 'Cancel'}
             </button>
             <button 

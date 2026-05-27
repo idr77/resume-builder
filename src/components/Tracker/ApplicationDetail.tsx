@@ -479,7 +479,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
                     value={dossierText}
                     onChange={(e) => setDossierText(e.target.value)}
                     onBlur={() => saveAllPendingChanges(notesText, dossierText, jdText, appStatus)}
-                    className="w-full h-36 p-2 text-[10px] border border-gray-200 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-350 rounded resize-none focus:outline-none focus:border-indigo-500"
+                    className="w-full h-36 p-2.5 text-[11px] bg-white border border-gray-200 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 rounded resize-none focus:outline-none focus:border-indigo-500 transition-colors"
                   />
                 ) : (
                   <div className="w-full h-36 p-3 overflow-y-auto border border-gray-200 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300 rounded text-[10px] leading-relaxed bg-gray-50/20 pr-2">
