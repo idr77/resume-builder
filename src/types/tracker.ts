@@ -23,4 +23,5 @@ export interface JobApplication {
   skillsDossierFileName?: string;
   resumeDataUsed?: ResumeData; // The CV data snapshot at application time
   notes?: string; // General application notes / comments
+  coverLetterText?: string; // Tailored motivation letter for this specific application
 }

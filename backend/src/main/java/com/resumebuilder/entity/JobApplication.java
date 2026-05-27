@@ -49,6 +49,9 @@ public class JobApplication {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "cover_letter_text", columnDefinition = "TEXT")
+    private String coverLetterText;
+
     @OneToMany(mappedBy = "application", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderBy("createdAt ASC")
     private List<InterviewStep> interviewSteps = new ArrayList<>();
@@ -172,5 +175,13 @@ public class JobApplication {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public String getCoverLetterText() {
+        return coverLetterText;
+    }
+
+    public void setCoverLetterText(String coverLetterText) {
+        this.coverLetterText = coverLetterText;
     }
 }

@@ -351,18 +351,28 @@ export const generateCoverLetterWithGemini = async (
   apiKey: string,
   resumeJson: string,
   jobDescription: string,
-  language: 'en' | 'fr'
+  language: 'en' | 'fr',
+  companyName?: string,
+  roleTitle?: string,
+  skillsDossierText?: string
 ): Promise<string> => {
     if (!apiKey) throw new Error('Gemini API Key is missing.');
     
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
     const langInstruction = language === 'fr' ? 'French' : 'English';
     
+    const companySection = companyName ? `\n- Target Company: "${companyName}"` : '';
+    const roleSection = roleTitle ? `\n- Target Role Title: "${roleTitle}"` : '';
+    const dossierSection = skillsDossierText && skillsDossierText.trim()
+      ? `\n- Candidate Master Background Document (Dossier de compétences):\n${skillsDossierText.trim()}\n`
+      : '';
+
     const prompt = `
   Role: You are an expert career coach helping a candidate write a compelling, professional cover letter.
   Task: Write a complete motivation letter based on the provided JSON Resume and Job Description.
   Language: ${langInstruction}.
-  
+  Context:${companySection}${roleSection}
+  ${dossierSection}
   Constraints:
   1. Return ONLY the letter text, formatted cleanly. Use standard formal letter structure.
   2. Do not use Markdown headings like # Cover Letter, but you can use newlines for paragraphs.

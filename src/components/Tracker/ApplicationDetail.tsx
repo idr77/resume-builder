@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { JobApplication, InterviewStep, ApplicationStatus } from '../../types/tracker';
 import type { ResumeData } from '../../types/resume';
-import { generateInterviewPrepWithGemini } from '../../utils/geminiApiService';
+import { generateInterviewPrepWithGemini, generateCoverLetterWithGemini } from '../../utils/geminiApiService';
 import { apiService } from '../../utils/apiService';
 import { ArrowLeft, Plus, Trash2, Sparkles, Loader2, Calendar, FileText, CheckCircle, Clock, XCircle, Save, FileUp } from 'lucide-react';
 import MarkdownRenderer from '../Common/MarkdownRenderer';
@@ -40,6 +40,11 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
   const [fileName, setFileName] = useState(application.skillsDossierFileName || '');
   const [dossierText, setDossierText] = useState(application.skillsDossierText || '');
 
+  // Cover Letter States
+  const [coverLetterText, setCoverLetterText] = useState(application.coverLetterText || '');
+  const [coverLetterMode, setCoverLetterMode] = useState<'edit' | 'preview'>('preview');
+  const [isGeneratingLetter, setIsGeneratingLetter] = useState(false);
+
   // Local notes state for typing and save status
   const [notesText, setNotesText] = useState('');
   const [appNotes, setAppNotes] = useState(application.notes || '');
@@ -58,6 +63,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
     setDossierText(application.skillsDossierText || '');
     setFileName(application.skillsDossierFileName || '');
     setAppStatus(application.status);
+    setCoverLetterText(application.coverLetterText || '');
 
     // Reset activeStepId to the first step of the new application
     const steps = application.interviewSteps || [];
@@ -70,6 +76,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
     // Reset Edit/Preview toggles
     setDossierMode('preview');
     setNotesMode('edit');
+    setCoverLetterMode('preview');
   }, [application.id]);
 
   // Timeline Step Notes syncing effect
@@ -83,7 +90,8 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
     nextDossier = dossierText, 
     nextJd = jdText, 
     nextStatus = appStatus,
-    nextAppNotes = appNotes
+    nextAppNotes = appNotes,
+    nextCoverLetter = coverLetterText
   ) => {
     setSaveStatus('saving');
     try {
@@ -101,7 +109,8 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
         skillsDossierText: nextDossier,
         skillsDossierFileName: fileName,
         interviewSteps: updatedSteps,
-        notes: nextAppNotes
+        notes: nextAppNotes,
+        coverLetterText: nextCoverLetter
       };
 
       onUpdate(updatedApp);
@@ -122,16 +131,17 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
     const hasDossierChanged = dossierText !== (application.skillsDossierText || '');
     const hasJdChanged = jdText !== application.jobDescription;
     const hasAppNotesChanged = appNotes !== (application.notes || '');
+    const hasCoverLetterChanged = coverLetterText !== (application.coverLetterText || '');
 
-    if (!hasNotesChanged && !hasDossierChanged && !hasJdChanged && !hasAppNotesChanged) return;
+    if (!hasNotesChanged && !hasDossierChanged && !hasJdChanged && !hasAppNotesChanged && !hasCoverLetterChanged) return;
 
     const timer = setTimeout(() => {
       console.log("Auto-saving application tracker modifications...");
-      saveAllPendingChanges(notesText, dossierText, jdText, appStatus, appNotes);
+      saveAllPendingChanges(notesText, dossierText, jdText, appStatus, appNotes, coverLetterText);
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [notesText, dossierText, jdText, appNotes]);
+  }, [notesText, dossierText, jdText, appNotes, coverLetterText]);
 
   const updateApplication = (fields: Partial<JobApplication>) => {
     const updatedSteps = (application.interviewSteps || []).map(s => {
@@ -149,6 +159,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
       skillsDossierFileName: fileName,
       interviewSteps: updatedSteps,
       notes: appNotes,
+      coverLetterText: coverLetterText,
       ...fields
     };
     onUpdate(updated);
@@ -235,6 +246,73 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
       });
     };
     reader.readAsText(file);
+  };
+
+  // Query Gemini or proxy through Backend AI Gateway to generate a custom Cover Letter for this application
+  const handleGenerateCoverLetter = async () => {
+    setAiError('');
+    setIsGeneratingLetter(true);
+
+    try {
+      const online = await apiService.checkHealth();
+      const isCloudConnected = online && apiService.isLoggedIn();
+      const apiKey = localStorage.getItem('gemini_api_key');
+      
+      if (!apiKey && !isCloudConnected) {
+        throw new Error(isFrench 
+          ? 'Clé API Gemini manquante. Configurez votre clé ou connectez-vous au Cloud.' 
+          : 'Missing Gemini API Key. Configure a key or connect to Cloud.');
+      }
+
+      const resumeDataRaw = (application.resumeDataUsed && Object.keys(application.resumeDataUsed).length > 0) 
+        ? application.resumeDataUsed 
+        : activeResumeData;
+      
+      // Clean builder state variables (targetJobDescription, coverLetter) from CV data to prevent prompt bleeding
+      const { targetJobDescription, coverLetter, ...cleanedResumeData } = resumeDataRaw || {};
+      
+      let letter = '';
+
+      if (isCloudConnected) {
+        // Secures calls via Backend Proxy Gateway (Uses Server Global Key or User Decrypted Key)
+        const systemInstruction = isFrench
+          ? "Vous êtes un coach en recrutement expert. Rédigez une lettre de motivation complète, percutante et professionnelle."
+          : "You are an expert recruitment coach. Generate a complete, compelling, and professional cover letter.";
+        const userPrompt = `
+          Entreprise cible : "${application.companyName || 'Non spécifiée'}"
+          Poste cible : "${application.roleTitle || 'Non spécifié'}"
+          CV du Candidat (JSON) : ${JSON.stringify(cleanedResumeData)}
+          Offre d'emploi : ${jdText || 'Non spécifiée'}
+          Notes supplémentaires / Dossier de compétences : ${dossierText || 'Aucun document supplémentaire.'}
+
+          CONSIGNES DE RÉDACTION :
+          - Langue : Rédigez entièrement en ${isFrench ? 'Français' : 'Anglais'}.
+          - Retournez UNIQUEMENT le texte de la lettre, formaté proprement avec des paragraphes bien espacés (structure formelle).
+          - Ne mettez PAS de titre Markdown comme '# Lettre de Motivation' ou '# Cover Letter'.
+          - Utilisez des placeholders classiques comme [Date], [Nom du recruteur] si nécessaire, et intégrez les détails du candidat (nom, prénom) déduits du CV.
+          - Alignez la lettre sur les exigences de l'offre d'emploi tout en valorisant les meilleures réalisations du candidat issues du CV et du dossier de compétences.
+        `;
+        letter = await apiService.proxyLlm(systemInstruction, userPrompt, 'GEMINI');
+      } else {
+        // Frontend direct browser call (Fallback)
+        letter = await generateCoverLetterWithGemini(
+          apiKey!,
+          JSON.stringify(cleanedResumeData),
+          jdText || '',
+          language,
+          application.companyName,
+          application.roleTitle,
+          dossierText
+        );
+      }
+
+      setCoverLetterText(letter);
+      saveAllPendingChanges(notesText, dossierText, jdText, appStatus, appNotes, letter);
+    } catch (err: any) {
+      setAiError(err.message || 'An error occurred.');
+    } finally {
+      setIsGeneratingLetter(false);
+    }
   };
 
   // Query Gemini or proxy through Backend AI Gateway for Interview Preparation Guide
@@ -496,6 +574,77 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Tailored Cover Letter Card */}
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-3 rounded-lg shadow-sm transition-colors text-xs space-y-2">
+            <div className="flex justify-between items-center mb-1">
+              <h3 className="font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                <FileText size={14} className="text-blue-500" />
+                {isFrench ? 'Lettre de motivation' : 'Cover Letter'}
+              </h3>
+              
+              <button
+                type="button"
+                onClick={handleGenerateCoverLetter}
+                disabled={isGeneratingLetter}
+                className="flex items-center gap-1 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-400 px-2 py-1 rounded-full font-bold text-[9px] transition cursor-pointer disabled:opacity-50"
+              >
+                {isGeneratingLetter ? (
+                  <><Loader2 size={10} className="animate-spin" /> {isFrench ? 'Génération...' : 'Generating...'}</>
+                ) : (
+                  <><Sparkles size={10} /> {isFrench ? 'Générer avec IA' : 'Generate with AI'}</>
+                )}
+              </button>
+            </div>
+            
+            <p className="text-[10px] text-gray-400 leading-normal">
+              {isFrench 
+                ? "Créez une lettre de motivation ciblée et impactante en accord avec votre profil de CV et cette offre."
+                : "Create a targeted cover letter optimized with your CV profile and this job description."}
+            </p>
+
+            <div className="relative space-y-2">
+              <div className="flex justify-end gap-1.5 text-[9px] mb-1">
+                <button
+                  type="button"
+                  onClick={() => setCoverLetterMode('edit')}
+                  className={`px-1.5 py-0.2 rounded border transition cursor-pointer font-bold ${coverLetterMode === 'edit' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                >
+                  {isFrench ? '✏️ Modifier' : '✏️ Edit'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCoverLetterMode('preview')}
+                  className={`px-1.5 py-0.2 rounded border transition cursor-pointer font-bold ${coverLetterMode === 'preview' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                >
+                  {isFrench ? '👁️ Aperçu' : '👁️ Preview'}
+                </button>
+              </div>
+
+              {coverLetterMode === 'edit' ? (
+                <textarea
+                  value={coverLetterText}
+                  onChange={(e) => setCoverLetterText(e.target.value)}
+                  onBlur={() => saveAllPendingChanges(notesText, dossierText, jdText, appStatus, appNotes, coverLetterText)}
+                  className="w-full h-44 p-2.5 text-[11px] bg-white border border-gray-200 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 rounded resize-none focus:outline-none focus:border-blue-500 transition-colors"
+                  placeholder={isFrench 
+                    ? "Rédigez votre lettre ou cliquez sur 'Générer avec IA'..." 
+                    : "Write your cover letter or click 'Generate with AI'..."
+                  }
+                />
+              ) : (
+                <div className="w-full h-44 p-3 overflow-y-auto border border-gray-200 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300 rounded text-[11px] leading-relaxed bg-gray-50/20 pr-2">
+                  {coverLetterText ? (
+                    <MarkdownRenderer content={coverLetterText} />
+                  ) : (
+                    <span className="text-gray-400 italic">
+                      {isFrench ? 'Aucune lettre de motivation rédigée.' : 'No cover letter written.'}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
