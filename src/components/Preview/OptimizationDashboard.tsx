@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import type { ResumeData } from '../../types/resume';
 import type { OptimizationResult } from '../../utils/atsOptimizer';
-import { extractKeywordsWithGemini } from '../../utils/geminiApiService';
+import { extractKeywordsWithGemini, generateAtsAdviceWithGemini } from '../../utils/geminiApiService';
 import { apiService } from '../../utils/apiService';
-import { CheckCircle, AlertTriangle, XCircle, ChevronDown, ChevronUp, Sparkles, UserCheck, ShieldAlert, BadgeCheck } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XCircle, ChevronDown, ChevronUp, Sparkles, UserCheck, ShieldAlert, BadgeCheck, Loader2 } from 'lucide-react';
+import MarkdownRenderer from '../Common/MarkdownRenderer';
 
 interface Props {
   data: ResumeData;
@@ -14,8 +15,100 @@ interface Props {
 
 export default function OptimizationDashboard({ data, onChange, result, setAiKeywords }: Props) {
   const lang = data.language;
+  const isFrench = lang === 'fr';
   const [isExtracting, setIsExtracting] = useState(false);
   const [isDiagnosticOpen, setIsDiagnosticOpen] = useState(false);
+
+  // States for Premium AI ATS Advice
+  const [aiAdvice, setAiAdvice] = useState<string>('');
+  const [isGeneratingAdvice, setIsGeneratingAdvice] = useState(false);
+  const [adviceError, setAdviceError] = useState<string>('');
+
+  const handleGenerateAiAdvice = async () => {
+    setAdviceError('');
+    setIsGeneratingAdvice(true);
+    try {
+      const online = await apiService.checkHealth();
+      const isCloudConnected = online && apiService.isLoggedIn();
+      const apiKey = localStorage.getItem('gemini_api_key');
+      
+      if (!apiKey && !isCloudConnected) {
+        throw new Error(isFrench 
+          ? "Clé API Gemini manquante. Veuillez configurer votre clé dans les paramètres ou vous connecter." 
+          : "Missing Gemini API Key. Please configure your key in Settings or log in.");
+      }
+
+      // Look for a skills dossier associated with this job description in the applications tracker
+      let skillsDossierText = '';
+      try {
+        const stored = localStorage.getItem('ats_applications_tracker');
+        if (stored) {
+          const apps = JSON.parse(stored) as any[];
+          // Match if the JD contains or matches a part of it
+          const match = apps.find(app => 
+            app.skillsDossierText && 
+            app.skillsDossierText.trim() &&
+            (app.jobDescription === data.targetJobDescription || 
+             (data.targetJobDescription && app.jobDescription && 
+              (data.targetJobDescription.includes(app.jobDescription.slice(0, 50)) || 
+               app.jobDescription.includes(data.targetJobDescription.slice(0, 50)))))
+          );
+          if (match) {
+            skillsDossierText = match.skillsDossierText;
+            console.log("Found matching skills dossier from tracker application:", match.companyName);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to lookup matching skills dossier", err);
+      }
+
+      const systemPrompt = isFrench
+        ? "Vous êtes un consultant en recrutement expert et un spécialiste de l'optimisation de CV pour les systèmes ATS. Votre but est de fournir des conseils ultra-précis pour adapter le CV d'un candidat à une offre d'emploi."
+        : "You are an expert recruitment consultant and ATS resume optimization specialist. Your goal is to provide ultra-precise feedback to align a candidate's CV with a target job description.";
+
+      const dossierSection = skillsDossierText.trim()
+        ? `\nDocument d'antécédents / Dossier de compétences supplémentaire :\n${skillsDossierText.trim()}\n`
+        : '';
+
+      const userPrompt = `
+        Offre d'emploi (Cible) : "${data.targetJobDescription || 'Non spécifiée'}"
+        CV Actuel (JSON) : ${JSON.stringify(data)}
+        ${dossierSection}
+
+        Tâche : Réalisez un audit ATS complet et donnez des recommandations ultra-actionnables structurées exactement ainsi :
+        
+        ### 📊 Analyse d'adéquation globale
+        (Donnez un score d'adéquation estimé sur 100 avec une analyse brève du profil face au poste)
+        
+        ### ➕ Éléments clés à AJOUTER au CV
+        (Listez précisément les mots-clés, technologies, soft skills, certifications ou formulations de réalisations manquantes sur le CV mais exigées par l'offre, et dites où et comment les insérer de manière naturelle sans suroptimisation artificielle)
+        
+        ### ➖ Éléments à SUPPRIMER ou reformuler
+        (Identifiez les technologies obsolètes, les expériences hors sujet par rapport à l'offre cible, les buzzwords inutiles ou les tournures passives à supprimer ou remplacer par des formulations dynamiques et chiffrées)
+        
+        ### 💡 Conseils de formulation et mise en valeur
+        (Donnez 3 exemples concrets de bullet points de vos expériences actuelles réécrits pour inclure les réalisations chiffrées/STAR adaptées à l'offre cible)
+
+        Contraintes strictes :
+        - Écrivez entièrement en ${isFrench ? 'Français' : 'English'}.
+        - Pas d'introduction polie ni de blabla inutile, démarrez directement avec les titres markdown.
+        - Soyez extrêmement concret, précis et réaliste.
+      `;
+
+      let response = '';
+      if (isCloudConnected) {
+        response = await apiService.proxyLlm(systemPrompt, userPrompt, 'GEMINI');
+      } else {
+        response = await generateAtsAdviceWithGemini(apiKey!, systemPrompt, userPrompt);
+      }
+
+      setAiAdvice(response);
+    } catch (err: any) {
+      setAdviceError(err.message || 'An error occurred.');
+    } finally {
+      setIsGeneratingAdvice(false);
+    }
+  };
 
   const handleExtractKeywords = async () => {
     try {
@@ -68,8 +161,6 @@ Description de poste : ${data.targetJobDescription}`;
       });
     }
   };
-
-  const isFrench = lang === 'fr';
 
   return (
     <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 transition-colors">
@@ -287,6 +378,45 @@ Description de poste : ${data.targetJobDescription}`;
               <div className="p-1.5 bg-gray-50 dark:bg-gray-800 rounded text-[9px] leading-relaxed text-gray-600 dark:text-gray-400 mt-2">
                 {result.actionVerbsAnalysis.recommendations[0]}
               </div>
+            </div>
+
+            {/* AI Optimization Advisor */}
+            <div className="col-span-1 md:col-span-3 bg-indigo-50/20 dark:bg-indigo-950/10 border border-indigo-100/40 dark:border-indigo-900/40 p-4 rounded-lg space-y-3 mt-2">
+              <div className="flex justify-between items-center flex-wrap gap-2">
+                <h4 className="font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5 text-xs">
+                  <Sparkles size={14} className="text-indigo-500 animate-pulse" />
+                  {isFrench ? '🔮 Conseiller ATS Intelligent (IA)' : '🔮 Intelligent ATS AI Advisor'}
+                </h4>
+
+                <button
+                  type="button"
+                  onClick={handleGenerateAiAdvice}
+                  disabled={isGeneratingAdvice || !data.targetJobDescription}
+                  className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white dark:bg-indigo-500 dark:hover:bg-indigo-600 px-3.5 py-1.5 rounded-full font-bold text-[10px] shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isGeneratingAdvice ? (
+                    <><Loader2 size={12} className="animate-spin" /> {isFrench ? 'Analyse...' : 'Analyzing...'}</>
+                  ) : (
+                    <><Sparkles size={12} /> {isFrench ? 'Générer l\'audit d\'adéquation IA' : 'Generate AI Match Audit'}</>
+                  )}
+                </button>
+              </div>
+
+              {adviceError && (
+                <div className="p-2.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-800 rounded text-[10px] font-semibold">{adviceError}</div>
+              )}
+
+              {aiAdvice ? (
+                <div className="bg-white dark:bg-gray-900 border border-gray-150 dark:border-gray-800/80 rounded-lg p-4 max-h-96 overflow-y-auto pr-2 scrollbar-thin shadow-inner transition-colors">
+                  <MarkdownRenderer content={aiAdvice} />
+                </div>
+              ) : (
+                <p className="text-[10px] text-gray-400 dark:text-gray-500 italic">
+                  {isFrench
+                    ? "Collez la description de poste dans l'encadré de gauche et cliquez sur le bouton ci-dessus pour obtenir un audit IA sur-mesure détaillant ce qu'il faut ajouter et supprimer de votre CV."
+                    : "Paste the job description in the left-hand text area and click the button above to get a tailored AI audit highlighting keywords to add or remove from your CV."}
+                </p>
+              )}
             </div>
 
           </div>

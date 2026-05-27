@@ -8,6 +8,7 @@ import VersionManager from './VersionManager';
 import { generateSkillsFromExperienceWithGemini, generateCoverLetterWithGemini } from '../../utils/geminiApiService';
 import { compressImage } from '../../utils/imageCompressor';
 import { ITSkillsDictionary } from '../../utils/itSkillsDictionary';
+import MarkdownRenderer from '../Common/MarkdownRenderer';
 
 interface Props {
   data: ResumeData;
@@ -25,6 +26,12 @@ export default function ResumeForm({ data, onChange, missingKeywords = [], activ
   const [isGeneratingSkills, setIsGeneratingSkills] = useState(false);
   const [isGeneratingCoverLetter, setIsGeneratingCoverLetter] = useState(false);
   const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
+
+  // States for toggling Markdown Edit / Preview mode
+  const [summaryMode, setSummaryMode] = useState<'edit' | 'preview'>('edit');
+  const [coverLetterMode, setCoverLetterMode] = useState<'edit' | 'preview'>('edit');
+  const [expModes, setExpModes] = useState<Record<string, 'edit' | 'preview'>>({});
+  const [eduModes, setEduModes] = useState<Record<string, 'edit' | 'preview'>>({});
 
   // States for interactive skills tags editor
   const [skillInput, setSkillInput] = useState('');
@@ -260,14 +267,37 @@ export default function ResumeForm({ data, onChange, missingKeywords = [], activ
           {openSection === 'summary' ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
         </button>
         {openSection === 'summary' && (
-          <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-            <textarea 
-              value={data.summary} 
-              onChange={(e) => handleFieldChange('summary', e.target.value)} 
-              rows={4}
-              className="w-full p-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors resize-none"
-              placeholder={t.summaryPlaceholder}
-            />
+          <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 space-y-2">
+            <div className="flex justify-end gap-1.5 text-[10px]">
+              <button
+                type="button"
+                onClick={() => setSummaryMode('edit')}
+                className={`px-2 py-0.5 rounded border transition cursor-pointer font-bold ${summaryMode === 'edit' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              >
+                {data.language === 'fr' ? '✏️ Modifier' : '✏️ Edit'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSummaryMode('preview')}
+                className={`px-2 py-0.5 rounded border transition cursor-pointer font-bold ${summaryMode === 'preview' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+              >
+                {data.language === 'fr' ? '👁️ Aperçu' : '👁️ Preview'}
+              </button>
+            </div>
+
+            {summaryMode === 'edit' ? (
+              <textarea 
+                value={data.summary} 
+                onChange={(e) => handleFieldChange('summary', e.target.value)} 
+                rows={4}
+                className="w-full p-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors resize-none text-xs"
+                placeholder={t.summaryPlaceholder}
+              />
+            ) : (
+              <div className="w-full p-3 min-h-[96px] border border-gray-200 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300 rounded leading-relaxed bg-gray-50/20 text-xs">
+                {data.summary ? <MarkdownRenderer content={data.summary} /> : <span className="text-gray-400 italic">{data.language === 'fr' ? 'Aucun résumé rédigé.' : 'No summary written.'}</span>}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -317,8 +347,34 @@ export default function ResumeForm({ data, onChange, missingKeywords = [], activ
                     </label>
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{t.descriptionBullet}</label>
-                    <textarea value={exp.description} onChange={(e) => updateArrayItem('experience', exp.id, {description: e.target.value})} rows={3} className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" />
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">{t.descriptionBullet}</label>
+                      <div className="flex gap-1 text-[9px]">
+                        <button
+                          type="button"
+                          onClick={() => setExpModes(prev => ({ ...prev, [exp.id]: 'edit' }))}
+                          className={`px-1.5 py-0.2 rounded border transition cursor-pointer font-bold ${expModes[exp.id] !== 'preview' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100'}`}
+                        >
+                          {data.language === 'fr' ? 'Modifier' : 'Edit'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setExpModes(prev => ({ ...prev, [exp.id]: 'preview' }))}
+                          className={`px-1.5 py-0.2 rounded border transition cursor-pointer font-bold ${expModes[exp.id] === 'preview' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100'}`}
+                        >
+                          {data.language === 'fr' ? 'Aperçu' : 'Preview'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {expModes[exp.id] === 'preview' ? (
+                      <div className="w-full p-2.5 min-h-[72px] bg-gray-50/20 text-gray-900 dark:text-gray-300 border border-gray-300 dark:border-gray-700 rounded text-xs leading-relaxed">
+                        {exp.description ? <MarkdownRenderer content={exp.description} /> : <span className="text-gray-400 italic">{data.language === 'fr' ? 'Aucune description rédigée.' : 'No description written.'}</span>}
+                      </div>
+                    ) : (
+                      <textarea value={exp.description} onChange={(e) => updateArrayItem('experience', exp.id, {description: e.target.value})} rows={3} className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-xs" />
+                    )}
+
                     <button
                       onClick={() => setRewriteIndex(exp.id)}
                       className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 px-2.5 py-1 rounded transition w-max cursor-pointer"
@@ -376,8 +432,33 @@ export default function ResumeForm({ data, onChange, missingKeywords = [], activ
                     <input type="text" placeholder="YYYY" value={edu.endDate} onChange={(e) => updateArrayItem('education', edu.id, {endDate: e.target.value})} className="w-full p-2 text-sm bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" />
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Description</label>
-                    <textarea value={edu.description} onChange={(e) => updateArrayItem('education', edu.id, {description: e.target.value})} rows={2} className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" />
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">Description</label>
+                      <div className="flex gap-1 text-[9px]">
+                        <button
+                          type="button"
+                          onClick={() => setEduModes(prev => ({ ...prev, [edu.id]: 'edit' }))}
+                          className={`px-1.5 py-0.2 rounded border transition cursor-pointer font-bold ${eduModes[edu.id] !== 'preview' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100'}`}
+                        >
+                          {data.language === 'fr' ? 'Modifier' : 'Edit'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEduModes(prev => ({ ...prev, [edu.id]: 'preview' }))}
+                          className={`px-1.5 py-0.2 rounded border transition cursor-pointer font-bold ${eduModes[edu.id] === 'preview' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100'}`}
+                        >
+                          {data.language === 'fr' ? 'Aperçu' : 'Preview'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {eduModes[edu.id] === 'preview' ? (
+                      <div className="w-full p-2.5 min-h-[64px] bg-gray-50/20 text-gray-900 dark:text-gray-300 border border-gray-300 dark:border-gray-700 rounded text-xs leading-relaxed">
+                        {edu.description ? <MarkdownRenderer content={edu.description} /> : <span className="text-gray-400 italic">{data.language === 'fr' ? 'Aucune description rédigée.' : 'No description written.'}</span>}
+                      </div>
+                    ) : (
+                      <textarea value={edu.description} onChange={(e) => updateArrayItem('education', edu.id, {description: e.target.value})} rows={2} className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors text-xs" />
+                    )}
                   </div>
                 </div>
               </div>
@@ -626,8 +707,25 @@ export default function ResumeForm({ data, onChange, missingKeywords = [], activ
           {openSection === 'coverLetter' ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
         </button>
         {openSection === 'coverLetter' && (
-          <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-             <div className="mb-3 flex justify-end">
+          <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 space-y-3">
+             <div className="flex justify-between items-center flex-wrap gap-2">
+               <div className="flex gap-1.5 text-[10px]">
+                 <button
+                   type="button"
+                   onClick={() => setCoverLetterMode('edit')}
+                   className={`px-2 py-0.5 rounded border transition cursor-pointer font-bold ${coverLetterMode === 'edit' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                 >
+                   {data.language === 'fr' ? '✏️ Modifier' : '✏️ Edit'}
+                 </button>
+                 <button
+                   type="button"
+                   onClick={() => setCoverLetterMode('preview')}
+                   className={`px-2 py-0.5 rounded border transition cursor-pointer font-bold ${coverLetterMode === 'preview' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                 >
+                   {data.language === 'fr' ? '👁️ Aperçu' : '👁️ Preview'}
+                 </button>
+               </div>
+
                <button
                   onClick={handleGenerateCoverLetter}
                   disabled={isGeneratingCoverLetter}
@@ -637,13 +735,20 @@ export default function ResumeForm({ data, onChange, missingKeywords = [], activ
                  {data.language === 'fr' ? 'Générer avec IA' : 'Generate with AI'}
                </button>
              </div>
-             <textarea 
-               value={data.coverLetter || ''} 
-               onChange={(e) => handleFieldChange('coverLetter', e.target.value)} 
-               rows={15}
-               className="w-full p-3 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition font-sans text-sm resize-none"
-               placeholder={data.language === 'fr' ? "Votre lettre de motivation apparaîtra ici..." : "Your cover letter will appear here..."}
-             />
+
+             {coverLetterMode === 'edit' ? (
+               <textarea 
+                 value={data.coverLetter || ''} 
+                 onChange={(e) => handleFieldChange('coverLetter', e.target.value)} 
+                 rows={15}
+                 className="w-full p-3 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition font-sans text-xs resize-none"
+                 placeholder={data.language === 'fr' ? "Votre lettre de motivation apparaîtra ici..." : "Your cover letter will appear here..."}
+               />
+             ) : (
+               <div className="w-full p-4 min-h-[300px] border border-gray-200 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300 rounded leading-relaxed bg-gray-50/20 text-xs">
+                 {data.coverLetter ? <MarkdownRenderer content={data.coverLetter} /> : <span className="text-gray-400 italic">{data.language === 'fr' ? 'Aucune lettre de motivation rédigée.' : 'No cover letter written.'}</span>}
+               </div>
+             )}
           </div>
         )}
       </div>

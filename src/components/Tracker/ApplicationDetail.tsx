@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import type { JobApplication, InterviewStep, ApplicationStatus } from '../../types/tracker';
+import type { ResumeData } from '../../types/resume';
 import { generateInterviewPrepWithGemini } from '../../utils/geminiApiService';
 import { apiService } from '../../utils/apiService';
 import { ArrowLeft, Plus, Trash2, Sparkles, Loader2, Calendar, FileText, CheckCircle, Clock, XCircle, Save, FileUp } from 'lucide-react';
+import MarkdownRenderer from '../Common/MarkdownRenderer';
 
 interface Props {
   application: JobApplication;
+  activeResumeData: ResumeData;
   onBack: () => void;
   onUpdate: (app: JobApplication) => void;
   language: 'en' | 'fr';
@@ -19,7 +22,7 @@ const statusColors: Record<ApplicationStatus, string> = {
   rejected: 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300 border-red-100 dark:border-red-800'
 };
 
-export default function ApplicationDetail({ application, onBack, onUpdate, language }: Props) {
+export default function ApplicationDetail({ application, activeResumeData, onBack, onUpdate, language }: Props) {
   const [appStatus, setAppStatus] = useState<ApplicationStatus>(application.status);
   const [jdText, setJdText] = useState(application.jobDescription);
   
@@ -42,6 +45,10 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
   const [appNotes, setAppNotes] = useState(application.notes || '');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
+  // Toggle modes for markdown fields
+  const [dossierMode, setDossierMode] = useState<'edit' | 'preview'>('preview');
+  const [notesMode, setNotesMode] = useState<'edit' | 'preview'>('edit');
+
   const isFrench = language === 'fr';
 
   // Sync state if application changes
@@ -51,8 +58,18 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
     setDossierText(application.skillsDossierText || '');
     setFileName(application.skillsDossierFileName || '');
     setAppStatus(application.status);
-    const step = (application.interviewSteps || []).find(s => s.id === activeStepId);
+
+    // Reset activeStepId to the first step of the new application
+    const steps = application.interviewSteps || [];
+    const firstStepId = steps.length > 0 ? steps[0].id : null;
+    setActiveStepId(firstStepId);
+
+    const step = steps.find(s => s.id === firstStepId);
     setNotesText(step ? step.notes || '' : '');
+
+    // Reset Edit/Preview toggles
+    setDossierMode('preview');
+    setNotesMode('edit');
   }, [application.id]);
 
   // Timeline Step Notes syncing effect
@@ -236,7 +253,9 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
           : 'Missing Gemini API Key. Configure a key or connect to Cloud.');
       }
 
-      const resumeData = application.resumeDataUsed || {};
+      const resumeData = (application.resumeDataUsed && Object.keys(application.resumeDataUsed).length > 0) 
+        ? application.resumeDataUsed 
+        : activeResumeData;
       let prepGuide = '';
 
       if (isCloudConnected) {
@@ -247,7 +266,7 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
         const userPrompt = `
           Étape d'entretien : "${stepTitle}"
           CV du Candidat : ${JSON.stringify(resumeData)}
-          Offre d'emploi : ${application.jobDescription || jdText}
+          Offre d'emploi : ${jdText || 'Non spécifiée'}
           Notes générales de la candidature : ${appNotes || 'Aucune note générale.'}
           Notes supplémentaires / Master Dossier : ${dossierText || 'Aucun document supplémentaire.'}
 
@@ -263,7 +282,7 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
         prepGuide = await generateInterviewPrepWithGemini(
           apiKey!,
           JSON.stringify(resumeData),
-          application.jobDescription || jdText,
+          jdText || '',
           stepTitle,
           dossierText,
           appNotes
@@ -429,17 +448,41 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
             </label>
 
             {dossierText && (
-              <div className="relative">
-                <textarea
-                  value={dossierText}
-                  onChange={(e) => setDossierText(e.target.value)}
-                  onBlur={() => saveAllPendingChanges(notesText, dossierText, jdText, appStatus)}
-                  className="w-full h-24 p-1.5 text-[10px] border border-gray-200 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 rounded resize-none"
-                />
+              <div className="relative space-y-2">
+                <div className="flex justify-end gap-1.5 text-[9px] mb-1">
+                  <button
+                    type="button"
+                    onClick={() => setDossierMode('edit')}
+                    className={`px-1.5 py-0.2 rounded border transition cursor-pointer font-bold ${dossierMode === 'edit' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                  >
+                    {isFrench ? '✏️ Modifier' : '✏️ Edit'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDossierMode('preview')}
+                    className={`px-1.5 py-0.2 rounded border transition cursor-pointer font-bold ${dossierMode === 'preview' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                  >
+                    {isFrench ? '👁️ Aperçu' : '👁️ Preview'}
+                  </button>
+                </div>
+
+                {dossierMode === 'edit' ? (
+                  <textarea
+                    value={dossierText}
+                    onChange={(e) => setDossierText(e.target.value)}
+                    onBlur={() => saveAllPendingChanges(notesText, dossierText, jdText, appStatus)}
+                    className="w-full h-36 p-2 text-[10px] border border-gray-200 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-350 rounded resize-none focus:outline-none focus:border-indigo-500"
+                  />
+                ) : (
+                  <div className="w-full h-36 p-3 overflow-y-auto border border-gray-200 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300 rounded text-[10px] leading-relaxed bg-gray-50/20 pr-2">
+                    <MarkdownRenderer content={dossierText} />
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={() => { setDossierText(''); setFileName(''); updateApplication({ skillsDossierText: '', skillsDossierFileName: '' }); }}
-                  className="absolute bottom-2 right-2 text-xs text-red-500 hover:text-red-700 bg-white dark:bg-gray-800 shadow-sm border border-red-100 dark:border-red-900 rounded px-1 cursor-pointer"
+                  className="absolute bottom-2 right-2 text-[10px] text-red-500 hover:text-red-700 bg-white dark:bg-gray-800 shadow-sm border border-red-100 dark:border-red-900 rounded px-1.5 py-0.5 cursor-pointer font-bold"
                 >
                   {isFrench ? 'Retirer' : 'Remove'}
                 </button>
@@ -476,18 +519,40 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
               </div>
 
               {/* Formatted Notes Markdown Area */}
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="font-bold text-gray-700 dark:text-gray-300">{isFrench ? '📝 Notes de l\'entretien' : '📝 Interview Notes'}</label>
-                  <span className="text-[10px] text-gray-400 italic">Supports Markdown</span>
+                  <div className="flex gap-1.5 text-[9px]">
+                    <button
+                      type="button"
+                      onClick={() => setNotesMode('edit')}
+                      className={`px-1.5 py-0.2 rounded border transition cursor-pointer font-bold ${notesMode === 'edit' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                    >
+                      {isFrench ? '✏️ Saisie' : '✏️ Edit'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNotesMode('preview')}
+                      className={`px-1.5 py-0.2 rounded border transition cursor-pointer font-bold ${notesMode === 'preview' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                    >
+                      {isFrench ? '👁️ Aperçu' : '👁️ Preview'}
+                    </button>
+                  </div>
                 </div>
-                <textarea 
-                  value={notesText}
-                  onChange={(e) => setNotesText(e.target.value)}
-                  onBlur={() => saveAllPendingChanges(notesText, dossierText, jdText, appStatus)}
-                  className="w-full h-32 p-3 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-sans resize-none transition-colors"
-                  placeholder={isFrench ? "- Vos questions prévues...\n- Réponses du recruteur...\n- Salaire évoqué : 65k...\n- Feedback : positif" : "- Questions to prepare...\n- Interviewer answers...\n- Budget discuss: 65k...\n- Feedback: Positive"}
-                />
+
+                {notesMode === 'edit' ? (
+                  <textarea 
+                    value={notesText}
+                    onChange={(e) => setNotesText(e.target.value)}
+                    onBlur={() => saveAllPendingChanges(notesText, dossierText, jdText, appStatus)}
+                    className="w-full h-32 p-3 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-sans resize-none transition-colors"
+                    placeholder={isFrench ? "- Vos questions prévues...\n- Réponses du recruteur...\n- Salaire évoqué : 65k...\n- Feedback : positif" : "- Questions to prepare...\n- Interviewer answers...\n- Budget discuss: 65k...\n- Feedback: Positive"}
+                  />
+                ) : (
+                  <div className="w-full h-32 p-3 overflow-y-auto border border-gray-200 dark:border-gray-800 dark:bg-gray-955 dark:text-gray-300 rounded text-xs leading-relaxed bg-gray-50/20 pr-2">
+                    {notesText ? <MarkdownRenderer content={notesText} /> : <span className="text-gray-400 italic">{isFrench ? 'Aucune note rédigée.' : 'No notes written.'}</span>}
+                  </div>
+                )}
               </div>
 
               {/* AI Preparation block */}
@@ -517,10 +582,8 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
                 )}
 
                 {activeStep.aiPrep ? (
-                  <div className="bg-indigo-50/20 dark:bg-indigo-950/10 border border-indigo-100/40 dark:border-indigo-900/40 rounded-lg p-3 max-h-72 overflow-y-auto pr-2 scrollbar-thin">
-                    <div className="text-[11px] leading-relaxed text-gray-700 dark:text-gray-300 whitespace-pre-line font-sans">
-                      {activeStep.aiPrep}
-                    </div>
+                  <div className="bg-indigo-50/20 dark:bg-indigo-950/10 border border-indigo-100/40 dark:border-indigo-900/40 rounded-lg p-4 max-h-96 overflow-y-auto pr-2 scrollbar-thin shadow-inner">
+                    <MarkdownRenderer content={activeStep.aiPrep} />
                   </div>
                 ) : (
                   <div className="text-center py-6 bg-gray-50/30 rounded border border-dashed border-gray-200 dark:border-gray-800 text-gray-400 italic text-[10px]">

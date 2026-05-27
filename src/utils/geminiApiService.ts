@@ -452,3 +452,30 @@ Constraints:
     throw error;
   }
 };
+
+export const generateAtsAdviceWithGemini = async (
+  apiKey: string,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<string> => {
+  if (!apiKey) throw new Error('Gemini API Key is missing.');
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          { role: 'user', parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }
+        ],
+        generationConfig: { temperature: 0.5 }
+      })
+    });
+    if (!response.ok) throw new Error('Failed to generate ATS advice from Gemini API');
+    return (await response.json()).candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+  } catch (error: any) {
+    console.error("Gemini ATS Advice Error:", error);
+    throw error;
+  }
+};

@@ -1,74 +1,104 @@
-# Plan d'implémentation - Notes Générales, Préparation Technique IA & Renommage ResumeT3ch
+# Plan d'implémentation - Rendu Markdown Global, Correction du Prompt de Candidature & Conseiller ATS IA Premium
 
-Ce plan détaille les modifications nécessaires pour :
-1. Ajouter un champ **Notes Générales** dans le suivi des candidatures (du frontend React jusqu'à la base de données PostgreSQL).
-2. Enrichir le prompt de l'**Assistant IA de Préparation** pour détecter les technologies mentionnées dans le titre de l'entretien (ex: *"Entretien technique Java Angular"*) ou la description de poste, et générer des révisions pratiques (questions, quiz, énigmes de type Codingame).
-3. Renommer l'application de *"Créateur de CV ATS"* à **"ResumeT3ch"** (dans l'interface et l'onglet de navigation).
+Ce plan détaille l'approche technique pour :
+1. **Formater le Markdown de manière Globale** : Rendre visuellement propre le Markdown partout où il est pris en compte, c'est-à-dire :
+   - **Candidatures** : L'assistant IA de préparation d'entretien, le Dossier de compétences et les **Notes d'étape d'entretien** (Timeline).
+   - **Édition de CV** : Le Résumé Professionnel, les descriptions d'**Expérience Professionnelle**, d'**Éducation** et la **Lettre de Motivation**.
+   - Ajout d'onglets premium `[✏️ Saisie / 👁️ Aperçu]` (ou `[Edit / Preview]`) pour tous ces champs textuels d'édition.
+2. **Résoudre le bug de candidature dans le prompt** : Garantir la parfaite correspondance de la candidature active et de ses états locaux (JD, Notes, CV snapshot) lors de la génération.
+3. **Ajouter le Conseiller ATS Intelligent (IA)** : Intégrer un bouton premium de diagnostic IA comparant le CV actuel, la description d'offre cible, et le dossier de compétences (si détecté) pour lister ce qu'il faut ajouter ou supprimer dans le CV.
 
 ---
 
-## 💡 Architecture & Flux de données
+## 💡 Architecture & Composants Proposés
 
-### 1. Champ Notes Générales (Candidature)
-* **Frontend** : Ajout d'une propriété `notes` à l'interface `JobApplication` (`src/types/tracker.ts`).
-* **UI/UX** : Rendu d'une carte d'édition premium sous le champ de Description de Poste, avec le même système d'auto-save débouncé anti-lag / enregistrement sur blur / sauvegarde manuelle.
-* **Backend** : 
-  - Ajout d'une colonne `notes` de type `TEXT` dans l'entité JPA `JobApplication.java`.
-  - Liaison dans le contrôleur `ApplicationController.java` pour le stockage en DB.
+### 1. Composant MarkdownRenderer Premium (Garantie Anti-XSS & Sans Package Lourd)
+* **Emplacement** : `src/components/Common/MarkdownRenderer.tsx` [NEW]
+* **Rôle** : Parseur de Markdown réactif et ultra-rapide qui convertit les structures Markdown standard (`###`, `-`, `**`, `> [!NOTE]`, code blocks ```` ``` ````, inline `\``) en balises HTML stylisées avec **Tailwind CSS**. 
+* **Avantages** : Zéro dépendance externe lourde, intégration native avec le thème sombre (dark mode) de l'application, et conformité totale avec la politique de style de `GEMINI.md`.
 
-### 2. Prompt IA Adaptatif (Préparation Technique)
-* Le prompt IA envoyé à Gemini (ou via le proxy Cloud) sera enrichi de directives strictes de **détection technologique adaptative** :
-  - Si le titre ou la description de l'étape mentionne des mots-clés techniques (*"technique"*, *"coding"*, *"codingame"*, *"test"*, etc.) ou liste des technos (*"Java"*, *"Angular"*, *"React"*) :
-    1. **Sujets techniques & Méthodes à réviser** : L'IA générera des quiz de syntaxe, des notions d'architecture (ex: RxJS, Garbage Collection) et des questions typiques.
-    2. **Codingame / Coding Quiz** : L'IA formulera des puzzles de code concrets, des exercices de débugging avec correction, basés sur le niveau requis.
-  - Le prompt inclura également les nouvelles **Notes Générales** de la candidature pour enrichir le contexte (ex : questions posées lors du premier contact RH, salaire évoqué, culture d'entreprise).
+### 2. Saisie et Aperçu Markdown sur les Champs Édition de CV & Candidature
+* **UI/UX** :
+  - **Dossier de compétences** et **Notes d'étape d'entretien** : Sélecteur d'onglet premium `✏️ Saisie` / `👁️ Aperçu` pour prévisualiser instantanément le Markdown rédigé.
+  - **Champs de CV** (Résumé, Description d'Expériences, Éducations, Lettre de Motivation) : Intégration de commutateurs réactifs `Edit` / `Preview` de façon discrète et esthétique en haut de chaque textarea.
+
+### 3. Correction du Bug de Sélection & Prompt (ApplicationDetail)
+* **Origine du bug** : 
+  1. L'état `activeStepId` n'était pas réinitialisé lorsque le composant changeait d'application active (changement de `application.id`), ce qui provoquait une fuite d'états (state bleeding) où le bouton de préparation d'entretien pointait sur l'ID d'étape de l'ancienne candidature.
+  2. Le prompt utilisait l'expression `application.jobDescription || jdText`, qui ignorait les modifications immédiates faites dans le textarea `jdText` avant que la sauvegarde débouncée ne se déclenche.
+* **Résolutions** :
+  - Ajouter un reset complet de `activeStepId` sur la première étape de la nouvelle candidature dans le `useEffect` synchronisant `application.id`.
+  - Transmettre `activeResumeData` comme prop à `ApplicationDetail` depuis `App.tsx` pour servir de fallback intelligent si le snapshot `resumeDataUsed` est absent.
+  - Utiliser systématiquement les états locaux réactifs (`jdText`, `dossierText`, `appNotes`) dans la construction des prompts IA.
+
+### 4. Conseiller ATS Intelligent par IA (Audit de Correspondance)
+* **Emplacement** : `src/components/Preview/OptimizationDashboard.tsx`
+* **Rôle** : Fournir une analyse comparative d'adéquation poussée par l'IA Gemini.
+* **Fonctionnalités** :
+  - **Recherche automatique du dossier de compétences** : Si l'utilisateur a rédigé ou importé un dossier de compétences dans l'une de ses candidatures du tracker (`ats_applications_tracker` dans le localStorage) avec une offre similaire, le conseiller le récupère automatiquement pour enrichir le diagnostic.
+  - **Plan de recommandation** : L'IA classe de manière rigoureuse les compétences/technos clés à **Ajouter** et à **Supprimer** (ou reformuler), avec des exemples concrets basés sur le profil du candidat.
+  - **Interface premium** : Ajout d'une boîte de dialogue AI ATS Advisor collapsible sous la grille de diagnostic premium actuelle, avec animations d'analyse et rendu fluide en Markdown.
 
 ---
 
 ## Proposed Changes
 
-### Component 1: Frontend Changes
+### Component 1: Composants Communs & Formateurs
 
-#### [MODIFY] [tracker.ts](file:///c:/DATA/Code/ResumeBuilder/src/types/tracker.ts)
-- Ajouter le champ facultatif `notes?: string;` à l'interface `JobApplication`.
+#### [NEW] [MarkdownRenderer.tsx](file:///c:/DATA/Code/ResumeBuilder/src/components/Common/MarkdownRenderer.tsx)
+- Créer un parseur de Markdown réactif et ultra-robuste.
+- Gérer les titres h2/h3/h4, les listes à puces (ordonnées/désordonnées), le texte en gras, les citations bloquées (`> `) et les blocs de code (avec surbrillance de syntaxe mono).
 
 #### [MODIFY] [geminiApiService.ts](file:///c:/DATA/Code/ResumeBuilder/src/utils/geminiApiService.ts)
-- Mettre à jour la signature de `generateInterviewPrepWithGemini` pour accepter le paramètre facultatif `applicationNotes?: string`.
-- Injecter les notes de candidatures dans le prompt envoyé à l'IA.
-- Ajouter des consignes strictes à l'IA pour s'adapter automatiquement si le titre de l'étape contient des technos ou le mot *"technique"* (génération d'exercices pratiques, questions d'architectures, quiz type Codingame).
-
-#### [MODIFY] [ApplicationDetail.tsx](file:///c:/DATA/Code/ResumeBuilder/src/components/Tracker/ApplicationDetail.tsx)
-- Gérer l'état local intermédiaire `appNotes` pour éviter les ralentissements clavier.
-- Adapter l'auto-save, l'enregistrement au `onBlur` et la fonction `saveAllPendingChanges` pour prendre en compte le nouveau champ.
-- Afficher un bloc d'édition premium *"📝 Notes Générales"* à droite sous le bloc *"Description de poste"*.
-- Adapter l'assemblage du prompt dans `handleGeneratePrep` (cloud & local) pour injecter les notes générales et les consignes d'adaptabilité technique.
-
-#### [MODIFY] [translations.ts](file:///c:/DATA/Code/ResumeBuilder/src/i18n/translations.ts)
-- Remplacer `'ATS Resume Builder'` et `'Créateur de CV ATS'` par `'ResumeT3ch'`.
-
-#### [MODIFY] [index.html](file:///c:/DATA/Code/ResumeBuilder/index.html)
-- Changer le titre de la page de `<title>resumebuilder</title>` à `<title>ResumeT3ch - AI Editor & Interview Coach</title>`.
+- Ajouter et exporter la fonction `generateAtsAdviceWithGemini(apiKey, systemPrompt, userPrompt)` pour interroger l'API Gemini 2.5 Flash lors des audits ATS.
 
 ---
 
-### Component 2: Backend Changes
+### Component 2: Rénovation des Détails de Candidatures (Tracker)
 
-#### [MODIFY] [JobApplication.java](file:///c:/DATA/Code/ResumeBuilder/backend/src/main/java/com/resumebuilder/entity/JobApplication.java)
-- Ajouter le champ `private String notes;` avec l'annotation `@Column(columnDefinition = "TEXT")`.
-- Générer les getters et setters correspondants.
+#### [MODIFY] [ApplicationDetail.tsx](file:///c:/DATA/Code/ResumeBuilder/src/components/Tracker/ApplicationDetail.tsx)
+- Importer `MarkdownRenderer` et `activeResumeData` en paramètre de Props.
+- Réinitialiser l'état `activeStepId` vers le premier élément de la timeline de l'application chargée lors du changement de `application.id` dans le `useEffect`.
+- Mettre en place un sélecteur d'onglet premium `dossierMode` (`'edit' | 'preview'`) pour le dossier de compétences (Master Dossier) afin de basculer instantanément entre la saisie textuelle et l'aperçu formaté en Markdown.
+- Mettre en place un sélecteur d'onglet premium `notesMode` (`'edit' | 'preview'`) pour le bloc des **Notes de l'entretien**.
+- Utiliser le composant `<MarkdownRenderer content={activeStep.aiPrep} />` dans le panneau IA de préparation.
+- Assainir le prompt IA (`handleGeneratePrep`) en utilisant `jdText` à la place de `application.jobDescription` pour capturer la saisie en temps réel et utiliser le fallback `application.resumeDataUsed || activeResumeData`.
 
-#### [MODIFY] [ApplicationController.java](file:///c:/DATA/Code/ResumeBuilder/backend/src/main/java/com/resumebuilder/controller/ApplicationController.java)
-- Mettre à jour `saveApplication` pour récupérer la valeur de `notes` depuis le payload JSON et l'appliquer à l'entité.
-- Mettre à jour `syncLocalApplications` pour synchroniser le champ `notes` lors des imports en masse.
+#### [MODIFY] [App.tsx](file:///c:/DATA/Code/ResumeBuilder/src/App.tsx)
+- Passer le `resumeData` actuel dans la prop `activeResumeData` lors de l'instanciation de `<ApplicationDetail />` à la ligne 369.
+
+---
+
+### Component 3: Saisie/Aperçu Markdown sur le Formulaire de CV
+
+#### [MODIFY] [ResumeForm.tsx](file:///c:/DATA/Code/ResumeBuilder/src/components/Form/ResumeForm.tsx)
+- Importer `MarkdownRenderer`.
+- Ajouter des états locaux réactifs de mode d'édition/aperçu :
+  - `summaryMode` ('edit' | 'preview')
+  - `coverLetterMode` ('edit' | 'preview')
+  - `expModes` (Record<string, 'edit' | 'preview'>) pour chaque expérience.
+  - `eduModes` (Record<string, 'edit' | 'preview'>) pour chaque éducation.
+- Intégrer des boutons commutateurs esthétiques `[Edit / Preview]` en haut à droite des zones de texte correspondantes.
+- Permettre le rendu formaté en Markdown en mode preview.
+
+---
+
+### Component 4: Audit Premium de CV (OptimizationDashboard)
+
+#### [MODIFY] [OptimizationDashboard.tsx](file:///c:/DATA/Code/ResumeBuilder/src/components/Preview/OptimizationDashboard.tsx)
+- Importer `MarkdownRenderer` et la fonction LLM correspondante.
+- Ajouter la méthode `handleGenerateAiAdvice` qui interroge l'IA Gemini 2.5 Flash et intègre les dossiers de compétences trouvés en background.
+- Intégrer visuellement le bloc `🔮 AI ATS Advisor` sous la section existante de diagnostic avec une animation de chargement et un rendu Markdown premium.
 
 ---
 
 ## Verification Plan
 
 ### Automated Tests
-- Lancer `npm run test` pour s'assurer de l'intégrité de la suite de tests.
+- Lancer `npm run test` pour s'assurer qu'aucun changement n'impacte les tests existants.
 
 ### Manual Verification
-1. **Enregistrement des Notes Générales** : Ouvrir une candidature, taper des notes dans la section *"Notes Générales"*, sortir du champ (blur) ou cliquer sur *"Enregistrer"*. Rafraîchir, vérifier la persistance en local et en base de données.
-2. **Entraînement Technique IA** : Créer une étape d'entretien nommée *"Entretien technique Java Angular"*. Lancer la génération IA. Vérifier que la section révision propose des questions d'architecture spécifiques à Java & Angular, et des exercices de coding/debugging pertinents.
-3. **Renommer l'application** : Vérifier que le bandeau supérieur de l'application affiche *"ResumeT3ch"* et que l'onglet de navigation du navigateur indique *"ResumeT3ch - AI Editor & Interview Coach"*.
+1. **Formatage Markdown (Candidatures)** : Lancer une préparation d'entretien IA dans le tracker. Vérifier que le guide d'entretien s'affiche bien formaté. Taper du Markdown dans le Dossier de compétences et les Notes d'entretien, cliquer sur le bouton "Aperçu", et vérifier le rendu visuel.
+2. **Formatage Markdown (Éditeur de CV)** : Ouvrir les sections Résumé, Expérience ou Lettre de Motivation. Taper du Markdown (ex: des puces `-`, du gras `**`), cliquer sur "Aperçu" et vérifier que le style s'affiche de façon esthétique.
+3. **Bug de Candidature** : Ouvrir deux candidatures différentes ayant des offres d'emploi distinctes. Lancer une génération de guide sur la seconde. Vérifier dans la console (ou via la réponse) que l'IA a rédigé des questions liées à la seconde offre d'emploi, sans aucune interférence.
+4. **Audit ATS Intelligent** : Aller dans l'éditeur de CV, développer le "Diagnostic ATS Premium" et cliquer sur "Générer l'audit d'adéquation IA". Vérifier que l'IA produit une critique constructive détaillée.

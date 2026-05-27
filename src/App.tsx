@@ -368,6 +368,7 @@ function App() {
             selectedApplication ? (
               <ApplicationDetail 
                 application={selectedApplication} 
+                activeResumeData={resumeData}
                 onBack={() => setSelectedApplication(null)}
                 onUpdate={async (updated) => {
                   setSelectedApplication(updated);
