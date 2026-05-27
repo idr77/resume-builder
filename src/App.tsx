@@ -91,6 +91,12 @@ function App() {
 
   const atsResult = useMemo(() => analyzeResumeMatch(resumeData, aiKeywords), [resumeData, aiKeywords]);
 
+  const memoizedPdfDocument = useMemo(() => {
+    return previewTab === 'cv' 
+      ? <PDFTemplate data={debouncedResumeData} template={debouncedResumeData.styleSettings?.template || 'classic'} /> 
+      : <CoverLetterPDFTemplate data={debouncedResumeData} />;
+  }, [debouncedResumeData, previewTab]);
+
   const handleImport = async (text: string) => {
     try {
       const parsed = JSON.parse(text);
@@ -408,10 +414,7 @@ function App() {
           </div>
 
           <PDFDownloadLink 
-            document={previewTab === 'cv' 
-              ? <PDFTemplate data={debouncedResumeData} template={debouncedResumeData.styleSettings?.template || 'classic'} /> 
-              : <CoverLetterPDFTemplate data={debouncedResumeData} />
-            } 
+            document={memoizedPdfDocument} 
             fileName={previewTab === 'cv' 
               ? `${resumeData.personalInfo.fullName.replace(/\s+/g, '_')}_Resume.pdf`
               : `${resumeData.personalInfo.fullName.replace(/\s+/g, '_')}_Cover_Letter.pdf`
@@ -437,11 +440,7 @@ function App() {
         
         <main className="flex-1 overflow-hidden p-0 bg-gray-200 dark:bg-gray-900 flex flex-col transition-colors">
           <PDFViewer width="100%" height="100%" className="border-none flex-1">
-            {previewTab === 'cv' ? (
-              <PDFTemplate data={debouncedResumeData} template={debouncedResumeData.styleSettings?.template || 'classic'} />
-            ) : (
-              <CoverLetterPDFTemplate data={debouncedResumeData} />
-            )}
+            {memoizedPdfDocument}
           </PDFViewer>
         </main>
       </div>
