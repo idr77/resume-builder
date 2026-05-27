@@ -395,7 +395,8 @@ export const generateInterviewPrepWithGemini = async (
   resumeJson: string,
   jobDescription: string,
   stepTitle: string,
-  skillsDossierText?: string
+  skillsDossierText?: string,
+  applicationNotes?: string
 ): Promise<string> => {
   if (!apiKey) throw new Error('Gemini API Key is missing.');
 
@@ -403,6 +404,10 @@ export const generateInterviewPrepWithGemini = async (
 
   const dossierSection = skillsDossierText && skillsDossierText.trim()
     ? `\nCandidate Master Background Document (Dossier de compétences) :\n${skillsDossierText.trim()}\n`
+    : '';
+
+  const notesSection = applicationNotes && applicationNotes.trim()
+    ? `\nGeneral Application Notes (Notes générales de la candidature) :\n${applicationNotes.trim()}\n`
     : '';
 
   const prompt = `
@@ -413,15 +418,24 @@ Context:
 - Target Job Description: "${jobDescription || 'Not specified'}"
 - Candidate Resume (JSON): "${resumeJson}"
 ${dossierSection}
+${notesSection}
 
 Constraints:
 1. Output format: Standard Markdown. Do not include markdown JSON blocks or introductory phrases like "Here is your guide". Start directly with the markdown content.
 2. The language of the guide must match the step title's language. If the title is in French ("Entretien Technique", "Fit"), write entirely in French. If in English, write entirely in English.
 3. Keep the content deeply aligned with the candidate's actual projects, technologies, and achievements mentioned in the resume and background documents. DO NOT invent details or projects.
-4. Structure the guide strictly into the following sections:
+
+4. CRITICAL - Technical Interview Round Detection & Adaptability:
+   - If the step title "${stepTitle}" or the description mentions keywords like "technique", "coding", "quiz", "codingame", "test", "live coding" or lists specific technologies (e.g. "Java", "Angular", "React", "Python", "SQL"):
+     - Treat this as a highly technical round.
+     - Under the section "### 💻 Sujets techniques & Méthodes à réviser", you MUST dynamically tailor the content to prepare the candidate for these exact technologies (e.g. concurrent programming or garbage collection in Java, state management or component lifecycle in React/Angular).
+     - You MUST include a dedicated subsection named "#### 🧠 Exercices de Coding / Debugging Pratique" within the tech review section. Generate 1 or 2 concrete exercises (e.g., typical Codingame puzzles, algorithms, or code snippets with bugs to debug) along with their elegant, optimal solutions and key explanations.
+     - Analyze the target Job Description to extract other key tech stacks, skills, or methodologies (e.g. SQL indexes, Docker, CI/CD pipelines) and integrate them in this technical preparation guide.
+
+5. Structure the guide strictly into the following sections:
    - ### 🎯 Objectifs de l'étape [Step Objectives]: Define the main focus of this step (HR, Technical, or Culture/Fit) and what the interviewer is evaluating.
    - ### ❓ Top 5 Questions & Réponses sur-mesure [Top 5 Custom Questions & Answers]: Write 5 highly probable questions for this step. For each question, provide a detailed, tailored answer using the candidate's actual experience bullet points (under the STAR framework if behavioral, or precise architectures/technologies if technical).
-   - ### 💻 Sujets techniques & Méthodes à réviser [Topics to Review]: Focus on specific tech stacks (e.g. React, Node, System Design) or behavioral storytelling frameworks corresponding to this step.
+   - ### 💻 Sujets techniques & Méthodes à réviser [Topics to Review]: Focus on specific tech stacks (e.g. React, Node, System Design) corresponding to this step. Include the technical coding exercises block here if a technical round is detected.
    - ### 💬 Questions intelligentes à poser [Smart Questions to Ask]: Provide 3 deep, non-obvious questions for the candidate to ask the interviewer.
   `;
 

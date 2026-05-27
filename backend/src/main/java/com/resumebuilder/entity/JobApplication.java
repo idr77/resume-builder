@@ -46,6 +46,9 @@ public class JobApplication {
     @Column(name = "resume_data_used")
     private Map<String, Object> resumeDataUsed;
 
+    @Column(columnDefinition = "TEXT")
+    private String notes;
+
     @OneToMany(mappedBy = "application", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderBy("createdAt ASC")
     private List<InterviewStep> interviewSteps = new ArrayList<>();
@@ -161,5 +164,13 @@ public class JobApplication {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
     }
 }

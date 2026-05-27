@@ -39,9 +39,21 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
 
   // Local notes state for typing and save status
   const [notesText, setNotesText] = useState('');
+  const [appNotes, setAppNotes] = useState(application.notes || '');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const isFrench = language === 'fr';
+
+  // Sync state if application changes
+  useEffect(() => {
+    setAppNotes(application.notes || '');
+    setJdText(application.jobDescription);
+    setDossierText(application.skillsDossierText || '');
+    setFileName(application.skillsDossierFileName || '');
+    setAppStatus(application.status);
+    const step = (application.interviewSteps || []).find(s => s.id === activeStepId);
+    setNotesText(step ? step.notes || '' : '');
+  }, [application.id]);
 
   // Timeline Step Notes syncing effect
   useEffect(() => {
@@ -49,7 +61,13 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
     setNotesText(step ? step.notes || '' : '');
   }, [activeStepId, application.interviewSteps]);
 
-  const saveAllPendingChanges = async (nextNotes = notesText, nextDossier = dossierText, nextJd = jdText, nextStatus = appStatus) => {
+  const saveAllPendingChanges = async (
+    nextNotes = notesText, 
+    nextDossier = dossierText, 
+    nextJd = jdText, 
+    nextStatus = appStatus,
+    nextAppNotes = appNotes
+  ) => {
     setSaveStatus('saving');
     try {
       const updatedSteps = (application.interviewSteps || []).map(s => {
@@ -65,7 +83,8 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
         jobDescription: nextJd,
         skillsDossierText: nextDossier,
         skillsDossierFileName: fileName,
-        interviewSteps: updatedSteps
+        interviewSteps: updatedSteps,
+        notes: nextAppNotes
       };
 
       onUpdate(updatedApp);
@@ -85,16 +104,17 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
     const hasNotesChanged = notesText !== currentNotes;
     const hasDossierChanged = dossierText !== (application.skillsDossierText || '');
     const hasJdChanged = jdText !== application.jobDescription;
+    const hasAppNotesChanged = appNotes !== (application.notes || '');
 
-    if (!hasNotesChanged && !hasDossierChanged && !hasJdChanged) return;
+    if (!hasNotesChanged && !hasDossierChanged && !hasJdChanged && !hasAppNotesChanged) return;
 
     const timer = setTimeout(() => {
       console.log("Auto-saving application tracker modifications...");
-      saveAllPendingChanges(notesText, dossierText, jdText, appStatus);
+      saveAllPendingChanges(notesText, dossierText, jdText, appStatus, appNotes);
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [notesText, dossierText, jdText]);
+  }, [notesText, dossierText, jdText, appNotes]);
 
   const updateApplication = (fields: Partial<JobApplication>) => {
     const updatedSteps = (application.interviewSteps || []).map(s => {
@@ -111,6 +131,7 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
       skillsDossierText: dossierText,
       skillsDossierFileName: fileName,
       interviewSteps: updatedSteps,
+      notes: appNotes,
       ...fields
     };
     onUpdate(updated);
@@ -227,7 +248,14 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
           Étape d'entretien : "${stepTitle}"
           CV du Candidat : ${JSON.stringify(resumeData)}
           Offre d'emploi : ${application.jobDescription || jdText}
+          Notes générales de la candidature : ${appNotes || 'Aucune note générale.'}
           Notes supplémentaires / Master Dossier : ${dossierText || 'Aucun document supplémentaire.'}
+
+          DIRECTIVE DE PRÉPARATION ADAPTATIVE TECHNIQUE (CRITIQUE) :
+          Si le titre de l'étape "${stepTitle}" ou la description de l'offre d'emploi contient des mots-clés techniques comme "technique", "coding", "quiz", "codingame", "test", "live coding", "entretien technique" ou liste des technologies (ex: Java, React, Angular, Python, SQL, Docker) :
+          - Considérez cela comme une étape d'évaluation technique rigoureuse.
+          - Sous la section "### Sujets techniques & Méthodes à réviser", vous DEVEZ adapter le contenu pour préparer spécifiquement le candidat à ces technologies (notions d'architectures, structures de données, bonnes pratiques de code).
+          - Vous DEVEZ ajouter une sous-section explicite "#### 🧠 Exercices de Coding / Debugging Pratique" à cet endroit. Générez 1 ou 2 exercices concrets (comme des énigmes algorithmiques types Codingame, ou des snippets de code avec des bugs à corriger) avec leurs corrections optimales élégantes et explications pédagogiques claires.
         `;
         prepGuide = await apiService.proxyLlm(systemInstruction, userPrompt, 'GEMINI');
       } else {
@@ -237,7 +265,8 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
           JSON.stringify(resumeData),
           application.jobDescription || jdText,
           stepTitle,
-          dossierText
+          dossierText,
+          appNotes
         );
       }
 
@@ -528,6 +557,31 @@ export default function ApplicationDetail({ application, onBack, onUpdate, langu
               >
                 <Save size={13} />
                 {isFrench ? 'Mettre à jour' : 'Update JD'}
+              </button>
+            </div>
+          </div>
+
+          {/* General Application Notes */}
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4 rounded-lg shadow-sm transition-colors text-xs space-y-2">
+            <h3 className="font-bold text-gray-700 dark:text-gray-300">{isFrench ? '📝 Notes Générales de la Candidature' : '📝 General Application Notes'}</h3>
+            <textarea 
+              value={appNotes}
+              onChange={(e) => setAppNotes(e.target.value)}
+              onBlur={(e) => saveAllPendingChanges(notesText, dossierText, jdText, appStatus, e.target.value)}
+              placeholder={isFrench 
+                ? "Saisissez des notes sur l'entreprise, contact RH, salaire, culture, questions clés..."
+                : "Enter notes on company research, HR contact details, discussed salary, fit questions..."
+              }
+              className="w-full h-32 p-3 border border-gray-300 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 rounded resize-none transition-colors"
+            />
+            <div className="flex justify-end">
+              <button 
+                type="button"
+                onClick={() => saveAllPendingChanges(notesText, dossierText, jdText, appStatus, appNotes)}
+                className="flex items-center gap-1.5 bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-950 px-4 py-1.5 rounded text-xs font-bold hover:opacity-90 transition cursor-pointer"
+              >
+                <Save size={13} />
+                {isFrench ? 'Mettre à jour' : 'Update Notes'}
               </button>
             </div>
           </div>

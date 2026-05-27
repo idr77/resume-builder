@@ -76,6 +76,7 @@ public class ApplicationController {
         application.setSkillsDossierFileName((String) payload.get("skillsDossierFileName"));
         application.setSkillsDossierText((String) payload.get("skillsDossierText"));
         application.setResumeDataUsed((Map<String, Object>) payload.get("resumeDataUsed"));
+        application.setNotes((String) payload.get("notes"));
         application.setUpdatedAt(OffsetDateTime.now());
 
         // Process nested interview steps
@@ -135,6 +136,7 @@ public class ApplicationController {
             app.setSkillsDossierFileName((String) localApp.get("skillsDossierFileName"));
             app.setSkillsDossierText((String) localApp.get("skillsDossierText"));
             app.setResumeDataUsed((Map<String, Object>) localApp.get("resumeDataUsed"));
+            app.setNotes((String) localApp.get("notes"));
 
             List<Map<String, Object>> stepsList = (List<Map<String, Object>>) localApp.get("interviewSteps");
             if (stepsList != null) {

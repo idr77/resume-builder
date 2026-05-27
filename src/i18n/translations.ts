@@ -3,7 +3,7 @@ import type { Language } from '../types/resume';
 export const translations = {
   en: {
     app: {
-      title: 'ATS Resume Builder',
+      title: 'ResumeT3ch',
       subtitle: 'Fill in your details below. Preview updates automatically.',
       quickImport: '✨ Quick Import Text (MVP)',
       livePreview: 'Live Preview',
@@ -57,7 +57,7 @@ export const translations = {
   },
   fr: {
     app: {
-      title: 'Créateur de CV ATS',
+      title: 'ResumeT3ch',
       subtitle: 'Remplissez vos informations ci-dessous. L\'aperçu se met à jour automatiquement.',
       quickImport: '✨ Import Rapide (MVP)',
       livePreview: 'Aperçu en direct',

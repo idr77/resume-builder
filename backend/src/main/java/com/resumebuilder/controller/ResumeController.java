@@ -147,6 +147,7 @@ public class ResumeController {
             resume = userResumes.get(0);
         }
 
+        final Resume activeResume = resume;
         for (Map<String, Object> localVer : localVersions) {
             String name = (String) localVer.get("name");
             Map<String, Object> data = (Map<String, Object>) localVer.get("data");
@@ -156,7 +157,7 @@ public class ResumeController {
             Optional<ResumeVersion> existingOpt = versionRepository.findByResumeUser_IdAndVersionName(userId, name);
             ResumeVersion version = existingOpt.orElseGet(() -> {
                 ResumeVersion v = new ResumeVersion();
-                v.setResume(resume);
+                v.setResume(activeResume);
                 v.setVersionName(name);
                 return v;
             });

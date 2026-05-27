@@ -22,4 +22,5 @@ export interface JobApplication {
   skillsDossierText?: string;
   skillsDossierFileName?: string;
   resumeDataUsed?: ResumeData; // The CV data snapshot at application time
+  notes?: string; // General application notes / comments
 }
