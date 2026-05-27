@@ -70,9 +70,12 @@ export default function OptimizationDashboard({ data, onChange, result, setAiKey
         ? `\nDocument d'antécédents / Dossier de compétences supplémentaire :\n${skillsDossierText.trim()}\n`
         : '';
 
+      // Clean builder state variables (targetJobDescription, coverLetter) from CV data to prevent prompt bleeding/bloat
+      const { targetJobDescription, coverLetter, ...cleanedData } = data || {};
+
       const userPrompt = `
         Offre d'emploi (Cible) : "${data.targetJobDescription || 'Non spécifiée'}"
-        CV Actuel (JSON) : ${JSON.stringify(data)}
+        CV Actuel (JSON) : ${JSON.stringify(cleanedData)}
         ${dossierSection}
 
         Tâche : Réalisez un audit ATS complet et donnez des recommandations ultra-actionnables structurées exactement ainsi :

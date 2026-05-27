@@ -396,7 +396,9 @@ export const generateInterviewPrepWithGemini = async (
   jobDescription: string,
   stepTitle: string,
   skillsDossierText?: string,
-  applicationNotes?: string
+  applicationNotes?: string,
+  companyName?: string,
+  roleTitle?: string
 ): Promise<string> => {
   if (!apiKey) throw new Error('Gemini API Key is missing.');
 
@@ -414,6 +416,8 @@ export const generateInterviewPrepWithGemini = async (
 Role: You are an expert interview coach and career consultant.
 Task: Create a highly customized, rigorous, and practical Interview Preparation Guide for the candidate based on the provided data.
 Context:
+- Target Company: "${companyName || 'Not specified'}"
+- Target Role Title: "${roleTitle || 'Not specified'}"
 - The candidate is preparing for the specific interview step: "${stepTitle}".
 - Target Job Description: "${jobDescription || 'Not specified'}"
 - Candidate Resume (JSON): "${resumeJson}"

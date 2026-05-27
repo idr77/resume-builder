@@ -253,19 +253,25 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
           : 'Missing Gemini API Key. Configure a key or connect to Cloud.');
       }
 
-      const resumeData = (application.resumeDataUsed && Object.keys(application.resumeDataUsed).length > 0) 
+      const resumeDataRaw = (application.resumeDataUsed && Object.keys(application.resumeDataUsed).length > 0) 
         ? application.resumeDataUsed 
         : activeResumeData;
+      
+      // Clean builder state variables (targetJobDescription, coverLetter) from CV data to prevent prompt bleeding
+      const { targetJobDescription, coverLetter, ...cleanedResumeData } = resumeDataRaw || {};
+      
       let prepGuide = '';
 
       if (isCloudConnected) {
         // Secures calls via Backend Proxy Gateway (Uses Server Global Key or User Decrypted Key)
         const systemInstruction = isFrench
-          ? "Vous êtes un coach en recrutement expert. Préparez un plan d'entraînement d'entretien structuré et des conseils basés sur le CV et l'offre d'emploi."
-          : "You are an expert recruitment coach. Generate a structured interview prep plan and advice based on the resume and job offer.";
+          ? "Vous êtes un coach en recrutement expert. Préparez un plan d'entraînement d'entretien structuré et des conseils basés sur le CV, l'entreprise et l'offre d'emploi."
+          : "You are an expert recruitment coach. Generate a structured interview prep plan and advice based on the resume, target company, and job offer.";
         const userPrompt = `
+          Entreprise cible : "${application.companyName || 'Non spécifiée'}"
+          Poste cible : "${application.roleTitle || 'Non spécifié'}"
           Étape d'entretien : "${stepTitle}"
-          CV du Candidat : ${JSON.stringify(resumeData)}
+          CV du Candidat (JSON) : ${JSON.stringify(cleanedResumeData)}
           Offre d'emploi : ${jdText || 'Non spécifiée'}
           Notes générales de la candidature : ${appNotes || 'Aucune note générale.'}
           Notes supplémentaires / Master Dossier : ${dossierText || 'Aucun document supplémentaire.'}
@@ -281,11 +287,13 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
         // Frontend direct browser call (Fallback)
         prepGuide = await generateInterviewPrepWithGemini(
           apiKey!,
-          JSON.stringify(resumeData),
+          JSON.stringify(cleanedResumeData),
           jdText || '',
           stepTitle,
           dossierText,
-          appNotes
+          appNotes,
+          application.companyName,
+          application.roleTitle
         );
       }
 
