@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { ResumeData } from '../../types/resume';
-import { Save, FolderOpen, Copy, Trash2, Database, ChevronDown, ChevronUp, Cloud } from 'lucide-react';
+import { Save, FolderOpen, Copy, Trash2, Database, ChevronDown, ChevronUp, Cloud, Star } from 'lucide-react';
 import { compressImage } from '../../utils/imageCompressor';
 import { apiService, type SavedVersion } from '../../utils/apiService';
 
@@ -19,6 +19,27 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
   const [message, setMessage] = useState('');
   const [isCloud, setIsCloud] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [defaultVersionId, setDefaultVersionId] = useState<string | null>(() => {
+    return localStorage.getItem('ats_default_cv_version_id');
+  });
+
+  const handleSetDefault = (versionId: string) => {
+    if (defaultVersionId === versionId) {
+      localStorage.removeItem('ats_default_cv_version_id');
+      setDefaultVersionId(null);
+      showNotification(language === 'fr' 
+        ? "Option retirée : le dernier CV modifié sera chargé au démarrage." 
+        : "Default unset: the latest modified CV will load on startup."
+      );
+    } else {
+      localStorage.setItem('ats_default_cv_version_id', versionId);
+      setDefaultVersionId(versionId);
+      showNotification(language === 'fr' 
+        ? "Version définie par défaut pour le démarrage !" 
+        : "Version set as default for startup!"
+      );
+    }
+  };
 
   // Safe wrapper for localStorage.setItem to handle quota errors
   const safeSetLocalStorage = (key: string, value: string): boolean => {
@@ -445,9 +466,25 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
                 
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button 
+                    onClick={() => handleSetDefault(v.id)}
+                    disabled={isLoading}
+                    className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-50 ${
+                      defaultVersionId === v.id
+                        ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40' 
+                        : 'text-gray-400 hover:text-amber-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                    title={
+                      defaultVersionId === v.id
+                        ? (isFrench ? 'Version par défaut (cliquer pour désactiver)' : 'Default version (click to unset)')
+                        : (isFrench ? 'Définir comme version par défaut' : 'Set as default version')
+                    }
+                  >
+                    <Star size={14} fill={defaultVersionId === v.id ? 'currentColor' : 'none'} />
+                  </button>
+                  <button 
                     onClick={() => handleLoad(v)}
                     disabled={isLoading}
-                    className="p-1 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:text-blue-800 rounded transition-colors cursor-pointer disabled:opacity-50"
+                    className="p-1 hover:bg-blue-50 dark:hover:bg-blue-955/40 text-blue-600 dark:text-blue-400 hover:text-blue-800 rounded transition-colors cursor-pointer disabled:opacity-50"
                     title={isFrench ? 'Charger cette version' : 'Load this version'}
                   >
                     <FolderOpen size={14} />

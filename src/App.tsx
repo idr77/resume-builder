@@ -47,16 +47,25 @@ function App() {
   // Load the latest resume version on mount (either from Postgres cloud DB or local localStorage fallback)
   useEffect(() => {
     const initializeData = async () => {
+      const defaultVersionId = localStorage.getItem('ats_default_cv_version_id');
+
       // 1. Try to load from Spring Boot Backend Cloud if online and logged in
       try {
         const online = await apiService.checkHealth();
         if (online && apiService.isLoggedIn()) {
           const cloudVersions = await apiService.fetchVersions();
           if (cloudVersions.length > 0) {
-            console.log("Loading latest resume version from cloud DB on mount...");
-            setResumeData(cloudVersions[0].data);
-            setDebouncedResumeData(cloudVersions[0].data);
-            setActiveVersion({ id: cloudVersions[0].id, name: cloudVersions[0].name });
+            let matchedVersion = cloudVersions[0];
+            if (defaultVersionId) {
+              const found = cloudVersions.find(v => v.id === defaultVersionId);
+              if (found) {
+                matchedVersion = found;
+                console.log("Loading default resume version from cloud DB on mount...");
+              }
+            }
+            setResumeData(matchedVersion.data);
+            setDebouncedResumeData(matchedVersion.data);
+            setActiveVersion({ id: matchedVersion.id, name: matchedVersion.name });
             return;
           }
         }
@@ -64,16 +73,23 @@ function App() {
         console.warn("Failed to load cloud CV data on mount, attempting local storage check", err);
       }
 
-      // 2. Fallback: Load the latest version from local localStorage history if present
+      // 2. Fallback: Load the default or latest version from local localStorage history if present
       try {
         const localHistoryStr = localStorage.getItem('ats_resumes_history');
         if (localHistoryStr) {
           const localHistory = JSON.parse(localHistoryStr) as { id: string; name: string; data: ResumeData }[];
           if (localHistory.length > 0) {
-            console.log("Loading latest resume version from localStorage history on mount...");
-            setResumeData(localHistory[0].data);
-            setDebouncedResumeData(localHistory[0].data);
-            setActiveVersion({ id: localHistory[0].id, name: localHistory[0].name });
+            let matchedVersion = localHistory[0];
+            if (defaultVersionId) {
+              const found = localHistory.find(v => v.id === defaultVersionId);
+              if (found) {
+                matchedVersion = found;
+                console.log("Loading default resume version from localStorage history on mount...");
+              }
+            }
+            setResumeData(matchedVersion.data);
+            setDebouncedResumeData(matchedVersion.data);
+            setActiveVersion({ id: matchedVersion.id, name: matchedVersion.name });
             return;
           }
         }
