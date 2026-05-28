@@ -3,7 +3,7 @@ import type { JobApplication, InterviewStep, ApplicationStatus } from '../../typ
 import type { ResumeData } from '../../types/resume';
 import { generateInterviewPrepWithGemini, generateCoverLetterWithGemini } from '../../utils/geminiApiService';
 import { apiService } from '../../utils/apiService';
-import { ArrowLeft, Plus, Trash2, Sparkles, Loader2, Calendar, FileText, CheckCircle, Clock, XCircle, Save, FileUp } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Sparkles, Loader2, Calendar, FileText, CheckCircle, Clock, XCircle, Save, FileUp, Copy, Share2 } from 'lucide-react';
 import MarkdownRenderer from '../Common/MarkdownRenderer';
 
 interface Props {
@@ -55,6 +55,206 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
   const [notesMode, setNotesMode] = useState<'edit' | 'preview'>('edit');
 
   const isFrench = language === 'fr';
+
+  // OneNote Export States & Methods
+  const [oneNotePrefix, setOneNotePrefix] = useState<'Opportunité' | 'Candidature' | 'Entretien' | 'custom'>('Opportunité');
+  const [oneNoteCustomPrefix, setOneNoteCustomPrefix] = useState('');
+  const [copiedTitle, setCopiedTitle] = useState(false);
+  const [copiedContent, setCopiedContent] = useState(false);
+  const [showOneNotePanel, setShowOneNotePanel] = useState(false);
+
+  // Initialize prefix when application status changes
+  useEffect(() => {
+    if (appStatus === 'interviewing') {
+      setOneNotePrefix('Entretien');
+    } else if (appStatus === 'draft') {
+      setOneNotePrefix('Opportunité');
+    } else {
+      setOneNotePrefix('Candidature');
+    }
+  }, [appStatus]);
+
+  const getPrefixString = () => {
+    if (oneNotePrefix === 'custom') {
+      return oneNoteCustomPrefix.trim() || (isFrench ? 'Candidature' : 'Application');
+    }
+    return oneNotePrefix;
+  };
+
+  const getOneNotePageTitle = () => {
+    return `${getPrefixString()} ${application.companyName}`;
+  };
+
+  const handleCopyTitle = async () => {
+    try {
+      await navigator.clipboard.writeText(getOneNotePageTitle());
+      setCopiedTitle(true);
+      setTimeout(() => setCopiedTitle(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy title', err);
+    }
+  };
+
+  const handleCopyContent = async () => {
+    const title = getOneNotePageTitle();
+    
+    // 1. Generate text/html blob (Premium Inline Styles for OneNote)
+    const stepsHtml = currentSteps.length > 0 ? `
+      <div style="margin-bottom: 28px;">
+        <h3 style="color: #80397b; font-size: 18px; font-weight: bold; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 16px; font-family: 'Segoe UI', sans-serif;">
+          🗓️ ${isFrench ? 'Étapes & Entretiens' : 'Recruitment Steps & Timeline'}
+        </h3>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px; text-align: left; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; font-family: 'Segoe UI', sans-serif;">
+          <thead>
+            <tr style="background-color: #f3f4f6; border-bottom: 2px solid #e5e7eb;">
+              <th style="padding: 12px 16px; font-weight: bold; color: #374151; border: 1px solid #e5e7eb;">${isFrench ? 'Étape' : 'Step'}</th>
+              <th style="padding: 12px 16px; font-weight: bold; color: #374151; width: 120px; border: 1px solid #e5e7eb;">${isFrench ? 'Statut' : 'Status'}</th>
+              <th style="padding: 12px 16px; font-weight: bold; color: #374151; border: 1px solid #e5e7eb;">Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${currentSteps.map((step, idx) => `
+              <tr style="border-bottom: 1px solid #e5e7eb; background-color: ${idx % 2 === 0 ? '#ffffff' : '#f9fafb'};">
+                <td style="padding: 14px 16px; font-weight: 600; color: #1f2937; vertical-align: top; border: 1px solid #e5e7eb;">
+                  ${step.title}
+                </td>
+                <td style="padding: 14px 16px; vertical-align: top; border: 1px solid #e5e7eb;">
+                  <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: bold; text-align: center; text-transform: uppercase; 
+                    background-color: ${step.status === 'completed' ? '#d1fae5' : step.status === 'failed' ? '#fee2e2' : '#fef3c7'}; 
+                    color: ${step.status === 'completed' ? '#065f46' : step.status === 'failed' ? '#991b1b' : '#92400e'}; border: 1px solid ${step.status === 'completed' ? '#bbf7d0' : step.status === 'failed' ? '#fecaca' : '#fef3c7'};">
+                    ${step.status === 'completed' ? (isFrench ? 'Complété' : 'Completed') : step.status === 'failed' ? (isFrench ? 'Échoué' : 'Failed') : (isFrench ? 'À venir' : 'Pending')}
+                  </span>
+                </td>
+                <td style="padding: 14px 16px; color: #4b5563; line-height: 1.5; vertical-align: top; border: 1px solid #e5e7eb;">
+                  ${step.notes ? `<div style="white-space: pre-wrap; margin-bottom: 8px;">${step.notes}</div>` : `<span style="color: #9ca3af; font-style: italic;">${isFrench ? 'Aucune note' : 'No notes'}</span>`}
+                  ${step.aiPrep ? `
+                    <div style="margin-top: 12px; background-color: #f5f3ff; border: 1px dashed #c084fc; padding: 12px; border-radius: 6px; font-size: 12px;">
+                      <strong style="color: #6b21a8; display: block; margin-bottom: 4px;">✨ ${isFrench ? 'Coaching de Préparation IA' : 'AI Interview Coach'} :</strong>
+                      <div style="color: #5b21b6; white-space: pre-wrap; font-family: 'Segoe UI', sans-serif;">${step.aiPrep}</div>
+                    </div>
+                  ` : ''}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    ` : '';
+
+    const htmlContent = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; color: #333333; line-height: 1.6; padding: 10px;">
+        <!-- Header Banner -->
+        <div style="background-color: #80397b; color: #ffffff; padding: 24px; border-radius: 12px; margin-bottom: 24px; border-left: 8px solid #4c1d95;">
+          <h1 style="margin: 0; font-size: 26px; font-weight: bold; color: #ffffff;">${application.companyName}</h1>
+          <h2 style="margin: 6px 0 0 0; font-size: 18px; font-weight: 500; color: #e9d5ff;">${application.roleTitle}</h2>
+          <div style="margin-top: 14px; font-size: 12px;">
+            <strong style="background-color: rgba(255, 255, 255, 0.2); padding: 4px 10px; border-radius: 4px; margin-right: 10px;">Statut : ${appStatus.toUpperCase()}</strong>
+            <strong style="background-color: rgba(255, 255, 255, 0.2); padding: 4px 10px; border-radius: 4px;">Date : ${application.appliedDate}</strong>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        ${appNotes ? `
+          <div style="margin-bottom: 28px;">
+            <h3 style="color: #80397b; font-size: 18px; font-weight: bold; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 12px; font-family: 'Segoe UI', sans-serif;">
+              📝 ${isFrench ? 'Notes Générales' : 'General Notes'}
+            </h3>
+            <div style="background-color: #fcfaff; border-left: 4px solid #80397b; padding: 14px 18px; border-radius: 0 8px 8px 0; font-size: 14px; color: #4b5563; white-space: pre-wrap; font-family: 'Segoe UI', sans-serif;">${appNotes}</div>
+          </div>
+        ` : ''}
+
+        <!-- Steps Timeline -->
+        ${stepsHtml}
+
+        <!-- Skills Dossier -->
+        ${dossierText ? `
+          <div style="margin-bottom: 28px;">
+            <h3 style="color: #80397b; font-size: 18px; font-weight: bold; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 12px; font-family: 'Segoe UI', sans-serif;">
+              💼 ${isFrench ? 'Dossier de Compétences & Notes Techniques' : 'Skills Dossier & Tech Notes'}
+            </h3>
+            <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; border-radius: 8px; font-size: 13px; color: #374151; white-space: pre-wrap; font-family: monospace;">${dossierText}</div>
+          </div>
+        ` : ''}
+
+        <!-- Cover Letter -->
+        ${coverLetterText ? `
+          <div style="margin-bottom: 28px;">
+            <h3 style="color: #80397b; font-size: 18px; font-weight: bold; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 12px; font-family: 'Segoe UI', sans-serif;">
+              ✉️ ${isFrench ? 'Lettre de Motivation' : 'Cover Letter'}
+            </h3>
+            <div style="background-color: #fcfcfc; border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px; font-size: 13px; color: #1f2937; line-height: 1.6; white-space: pre-wrap; font-family: 'Segoe UI', sans-serif;">${coverLetterText}</div>
+          </div>
+        ` : ''}
+
+        <!-- Job Description -->
+        ${jdText ? `
+          <div style="margin-bottom: 28px;">
+            <h3 style="color: #80397b; font-size: 18px; font-weight: bold; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 12px; font-family: 'Segoe UI', sans-serif;">
+              📋 ${isFrench ? 'Description du Poste' : 'Job Description'}
+            </h3>
+            <div style="background-color: #fafafa; border: 1px solid #e5e7eb; padding: 16px; border-radius: 8px; font-size: 12px; color: #6b7280; white-space: pre-wrap; font-family: 'Segoe UI', sans-serif;">${jdText}</div>
+          </div>
+        ` : ''}
+
+        <hr style="border: 0; border-top: 1px solid #e5e7eb; margin-top: 30px; margin-bottom: 10px;" />
+        <p style="font-size: 11px; color: #9ca3af; text-align: right; font-style: italic; font-family: 'Segoe UI', sans-serif;">
+          ${isFrench ? 'Candidature exportée depuis ATS Resume Builder.' : 'Application exported from ATS Resume Builder.'}
+        </p>
+      </div>
+    `;
+
+    // 2. Generate clean markdown/plain text fallback
+    let plainText = `# ${title}\n\n`;
+    plainText += `**${isFrench ? 'Statut' : 'Status'}**: ${appStatus.toUpperCase()}\n`;
+    plainText += `**Date**: ${application.appliedDate}\n\n`;
+    
+    if (appNotes) {
+      plainText += `## 📝 ${isFrench ? 'Notes Générales' : 'General Notes'}\n${appNotes}\n\n`;
+    }
+    
+    if (currentSteps.length > 0) {
+      plainText += `## 🗓️ ${isFrench ? 'Étapes & Entretiens' : 'Recruitment Steps & Timeline'}\n`;
+      currentSteps.forEach(s => {
+        plainText += `### ${s.title} [${s.status.toUpperCase()}]\n`;
+        if (s.notes) plainText += `${s.notes}\n`;
+        if (s.aiPrep) plainText += `\n*✨ Prep Coach AI*:\n${s.aiPrep}\n`;
+        plainText += `\n`;
+      });
+    }
+    
+    if (dossierText) {
+      plainText += `## 💼 ${isFrench ? 'Dossier de Compétences' : 'Skills Dossier'}\n${dossierText}\n\n`;
+    }
+    
+    if (coverLetterText) {
+      plainText += `## ✉️ ${isFrench ? 'Lettre de Motivation' : 'Cover Letter'}\n${coverLetterText}\n\n`;
+    }
+    
+    if (jdText) {
+      plainText += `## 📋 ${isFrench ? 'Description du Poste' : 'Job Description'}\n${jdText}\n\n`;
+    }
+
+    try {
+      const textBlob = new Blob([plainText], { type: 'text/plain' });
+      const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+      const clipboardItem = new ClipboardItem({
+        'text/plain': textBlob,
+        'text/html': htmlBlob,
+      });
+      await navigator.clipboard.write([clipboardItem]);
+      setCopiedContent(true);
+      setTimeout(() => setCopiedContent(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy rich text: ', err);
+      try {
+        await navigator.clipboard.writeText(plainText);
+        setCopiedContent(true);
+        setTimeout(() => setCopiedContent(false), 2000);
+      } catch (fallbackErr) {
+        alert(isFrench ? 'Impossible de copier dans le presse-papier.' : 'Could not copy to clipboard.');
+      }
+    }
+  };
 
   // Sync state if application changes
   useEffect(() => {
@@ -437,8 +637,156 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
               <option value="rejected">{isFrench ? 'Refusé' : 'Rejected'}</option>
             </select>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setShowOneNotePanel(!showOneNotePanel)}
+            className={`flex items-center gap-1 text-[11px] font-bold shadow-sm transition-colors cursor-pointer px-3 py-1.5 rounded ${
+              showOneNotePanel 
+                ? 'bg-purple-900 border border-purple-800 text-white' 
+                : 'bg-[#80397b] hover:bg-[#6c3069] text-white'
+            }`}
+          >
+            <Share2 size={13} />
+            {isFrench ? 'Copier OneNote' : 'Copy OneNote'}
+          </button>
         </div>
       </div>
+
+      {/* OneNote Export Panel */}
+      {showOneNotePanel && (
+        <div className="bg-purple-50 dark:bg-[#2e1c2e]/30 border border-purple-200 dark:border-purple-950/80 p-4 rounded-lg shadow-sm space-y-3 animate-fade-in transition-all">
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="text-xs font-bold text-[#80397b] dark:text-purple-300 flex items-center gap-1.5 uppercase tracking-wider">
+                <Share2 size={14} className="text-[#80397b] dark:text-purple-400" />
+                {isFrench ? 'Export Formaté pour OneNote' : 'Formatted Export for OneNote'}
+              </h3>
+              <p className="text-[10px] text-gray-500 dark:text-purple-200/60 mt-1 leading-normal">
+                {isFrench 
+                  ? "Copiez le titre et le contenu ci-dessous dans votre OneNote. Le contenu est copié en format enrichi (HTML) avec mise en page et couleurs préservées !" 
+                  : "Copy the title and body below to your OneNote. The body is copied in rich text (HTML) format, keeping all style and colors!"}
+              </p>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => setShowOneNotePanel(false)}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-purple-300 font-bold text-xs"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+            {/* Title Selector & Copy */}
+            <div className="bg-white dark:bg-gray-900 border border-purple-100 dark:border-purple-950 p-3 rounded-lg flex flex-col justify-between space-y-3">
+              <div className="space-y-2">
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400">
+                  {isFrench ? '1. CHOISIR LE PRÉFIXE DE LA PAGE ONENOTE' : '1. CHOOSE ONENOTE PAGE PREFIX'}
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  {(['Opportunité', 'Candidature', 'Entretien'] as const).map(pref => (
+                    <button
+                      key={pref}
+                      type="button"
+                      onClick={() => setOneNotePrefix(pref)}
+                      className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
+                        oneNotePrefix === pref 
+                          ? 'bg-purple-100 dark:bg-purple-950 border-[#80397b] text-[#80397b] dark:text-purple-300' 
+                          : 'bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'
+                      }`}
+                    >
+                      {pref}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setOneNotePrefix('custom')}
+                    className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors cursor-pointer ${
+                      oneNotePrefix === 'custom' 
+                        ? 'bg-purple-100 dark:bg-purple-950 border-[#80397b] text-[#80397b] dark:text-purple-300' 
+                        : 'bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'
+                    }`}
+                  >
+                    {isFrench ? 'Autre...' : 'Custom...'}
+                  </button>
+                </div>
+
+                {oneNotePrefix === 'custom' && (
+                  <input
+                    type="text"
+                    value={oneNoteCustomPrefix}
+                    onChange={(e) => setOneNoteCustomPrefix(e.target.value)}
+                    placeholder={isFrench ? "Ex: Offre de..." : "e.g. Offer from..."}
+                    className="w-full p-1.5 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                  />
+                )}
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-purple-50 dark:border-purple-950/40">
+                <div className="text-[10px] font-bold text-gray-400">
+                  {isFrench ? 'TITRE GÉNÉRÉ :' : 'GENERATED TITLE:'}
+                </div>
+                <div className="text-xs font-bold text-gray-700 dark:text-gray-300 bg-purple-50/50 dark:bg-purple-950/20 p-2 rounded border border-dashed border-purple-200 dark:border-purple-900 truncate">
+                  {getOneNotePageTitle()}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyTitle}
+                  className="w-full flex items-center justify-center gap-1.5 bg-[#80397b] hover:bg-[#6c3069] text-white py-1.5 rounded text-xs font-bold transition-all shadow-sm cursor-pointer"
+                >
+                  {copiedTitle ? (
+                    <>
+                      <CheckCircle size={14} />
+                      {isFrench ? 'Titre Copié !' : 'Title Copied!'}
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={14} />
+                      {isFrench ? 'Copier le Titre' : 'Copy Title'}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Content Copy Block */}
+            <div className="bg-white dark:bg-gray-900 border border-purple-100 dark:border-purple-950 p-3 rounded-lg flex flex-col justify-between space-y-4">
+              <div className="space-y-2">
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400">
+                  {isFrench ? '2. CONTENU DU DOSSIER DE CANDIDATURE' : '2. APPLICATION DOSSIER CONTENT'}
+                </label>
+                <div className="text-[10px] text-gray-400 leading-relaxed">
+                  {isFrench 
+                    ? "Inclus la description de poste, vos notes générales, l'historique complet de vos entretiens et notes ainsi que les fiches de préparation IA !" 
+                    : "Includes job description, general notes, full interview step logs and matching AI preparation coaches!"}
+                </div>
+                <div className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold bg-purple-50 dark:bg-purple-950/20 px-2 py-1.5 rounded border border-purple-100 dark:border-purple-900/40">
+                  ✓ {isFrench ? 'Format enrichi compatible OneNote' : 'OneNote compatible rich formatting'}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCopyContent}
+                className="w-full flex items-center justify-center gap-2 bg-[#80397b] hover:bg-[#6c3069] text-white py-3 rounded-lg text-sm font-bold transition-all shadow-md cursor-pointer"
+              >
+                {copiedContent ? (
+                  <>
+                    <CheckCircle size={18} />
+                    {isFrench ? 'Contenu Copié ! Prêt à coller' : 'Content Copied! Ready to Paste'}
+                  </>
+                ) : (
+                  <>
+                    <Copy size={18} />
+                    {isFrench ? 'Copier le Dossier Complet' : 'Copy Complete Dossier'}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Info */}
       <div className="bg-white dark:bg-gray-900 p-4 border border-gray-200 dark:border-gray-800 rounded-lg shadow-sm space-y-2 transition-colors">
