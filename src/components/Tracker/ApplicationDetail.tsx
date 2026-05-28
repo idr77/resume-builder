@@ -14,6 +14,92 @@ interface Props {
   language: 'en' | 'fr';
 }
 
+const parseMarkdownToHtml = (md: string) => {
+  if (!md) return '';
+  
+  let escaped = md
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  const lines = escaped.split('\n');
+  let inList = false;
+  const processedLines = [];
+
+  for (let line of lines) {
+    const trimmed = line.trim();
+    
+    if (trimmed.startsWith('### ')) {
+      if (inList) {
+        processedLines.push('</ul>');
+        inList = false;
+      }
+      const headerText = trimmed.substring(4);
+      processedLines.push(`<h4 style="color: #80397b; font-size: 14px; font-weight: bold; margin-top: 14px; margin-bottom: 6px; font-family: 'Segoe UI', sans-serif;">${headerText}</h4>`);
+      continue;
+    }
+    if (trimmed.startsWith('## ')) {
+      if (inList) {
+        processedLines.push('</ul>');
+        inList = false;
+      }
+      const headerText = trimmed.substring(3);
+      processedLines.push(`<h3 style="color: #80397b; font-size: 16px; font-weight: bold; margin-top: 16px; margin-bottom: 8px; font-family: 'Segoe UI', sans-serif;">${headerText}</h3>`);
+      continue;
+    }
+    if (trimmed.startsWith('# ')) {
+      if (inList) {
+        processedLines.push('</ul>');
+        inList = false;
+      }
+      const headerText = trimmed.substring(2);
+      processedLines.push(`<h2 style="color: #80397b; font-size: 18px; font-weight: bold; margin-top: 18px; margin-bottom: 10px; font-family: 'Segoe UI', sans-serif;">${headerText}</h2>`);
+      continue;
+    }
+
+    const listMatch = line.match(/^(\s*)([-*+])\s+(.*)$/);
+    if (listMatch) {
+      if (!inList) {
+        processedLines.push('<ul style="margin: 4px 0 12px 20px; padding: 0; list-style-type: disc; font-family: \'Segoe UI\', sans-serif;">');
+        inList = true;
+      }
+      const content = listMatch[3];
+      let inlineItem = content;
+      inlineItem = inlineItem.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      inlineItem = inlineItem.replace(/__(.*?)__/g, '<strong>$1</strong>');
+      inlineItem = inlineItem.replace(/\*(.*?)\*/g, '<em>$1</em>');
+      inlineItem = inlineItem.replace(/_(.*?)_/g, '<em>$1</em>');
+      inlineItem = inlineItem.replace(/`(.*?)`/g, '<code style="background-color: #f3f4f6; color: #1f2937; padding: 2px 4px; border-radius: 4px; font-family: monospace; font-size: 12px;">$1</code>');
+      processedLines.push(`<li style="margin-bottom: 4px; font-family: 'Segoe UI', sans-serif; font-size: 13px; color: #374151;">${inlineItem}</li>`);
+      continue;
+    } else {
+      if (inList) {
+        processedLines.push('</ul>');
+        inList = false;
+      }
+    }
+
+    let inlineLine = line;
+    inlineLine = inlineLine.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    inlineLine = inlineLine.replace(/__(.*?)__/g, '<strong>$1</strong>');
+    inlineLine = inlineLine.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    inlineLine = inlineLine.replace(/_(.*?)_/g, '<em>$1</em>');
+    inlineLine = inlineLine.replace(/`(.*?)`/g, '<code style="background-color: #f3f4f6; color: #1f2937; padding: 2px 4px; border-radius: 4px; font-family: monospace; font-size: 12px;">$1</code>');
+
+    if (trimmed === '') {
+      processedLines.push('<br />');
+    } else {
+      processedLines.push(`<div style="margin-bottom: 4px; font-family: 'Segoe UI', sans-serif; font-size: 13px; color: #374151;">${inlineLine}</div>`);
+    }
+  }
+
+  if (inList) {
+    processedLines.push('</ul>');
+  }
+
+  return processedLines.join('\n');
+};
+
 const statusColors: Record<ApplicationStatus, string> = {
   draft: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700',
   applied: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-blue-100 dark:border-blue-800',
@@ -126,11 +212,11 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
                   </span>
                 </td>
                 <td style="padding: 14px 16px; color: #4b5563; line-height: 1.5; vertical-align: top; border: 1px solid #e5e7eb;">
-                  ${step.notes ? `<div style="white-space: pre-wrap; margin-bottom: 8px;">${step.notes}</div>` : `<span style="color: #9ca3af; font-style: italic;">${isFrench ? 'Aucune note' : 'No notes'}</span>`}
+                  ${step.notes ? `<div style="margin-bottom: 8px;">${parseMarkdownToHtml(step.notes)}</div>` : `<span style="color: #9ca3af; font-style: italic;">${isFrench ? 'Aucune note' : 'No notes'}</span>`}
                   ${step.aiPrep ? `
                     <div style="margin-top: 12px; background-color: #f5f3ff; border: 1px dashed #c084fc; padding: 12px; border-radius: 6px; font-size: 12px;">
                       <strong style="color: #6b21a8; display: block; margin-bottom: 4px;">✨ ${isFrench ? 'Coaching de Préparation IA' : 'AI Interview Coach'} :</strong>
-                      <div style="color: #5b21b6; white-space: pre-wrap; font-family: 'Segoe UI', sans-serif;">${step.aiPrep}</div>
+                      <div>${parseMarkdownToHtml(step.aiPrep)}</div>
                     </div>
                   ` : ''}
                 </td>
@@ -159,7 +245,9 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
             <h3 style="color: #80397b; font-size: 18px; font-weight: bold; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 12px; font-family: 'Segoe UI', sans-serif;">
               📝 ${isFrench ? 'Notes Générales' : 'General Notes'}
             </h3>
-            <div style="background-color: #fcfaff; border-left: 4px solid #80397b; padding: 14px 18px; border-radius: 0 8px 8px 0; font-size: 14px; color: #4b5563; white-space: pre-wrap; font-family: 'Segoe UI', sans-serif;">${appNotes}</div>
+            <div style="background-color: #fcfaff; border-left: 4px solid #80397b; padding: 14px 18px; border-radius: 0 8px 8px 0;">
+              ${parseMarkdownToHtml(appNotes)}
+            </div>
           </div>
         ` : ''}
 
@@ -172,7 +260,9 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
             <h3 style="color: #80397b; font-size: 18px; font-weight: bold; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 12px; font-family: 'Segoe UI', sans-serif;">
               💼 ${isFrench ? 'Dossier de Compétences & Notes Techniques' : 'Skills Dossier & Tech Notes'}
             </h3>
-            <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; border-radius: 8px; font-size: 13px; color: #374151; white-space: pre-wrap; font-family: monospace;">${dossierText}</div>
+            <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; padding: 16px; border-radius: 8px;">
+              ${parseMarkdownToHtml(dossierText)}
+            </div>
           </div>
         ` : ''}
 
@@ -182,7 +272,9 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
             <h3 style="color: #80397b; font-size: 18px; font-weight: bold; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 12px; font-family: 'Segoe UI', sans-serif;">
               ✉️ ${isFrench ? 'Lettre de Motivation' : 'Cover Letter'}
             </h3>
-            <div style="background-color: #fcfcfc; border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px; font-size: 13px; color: #1f2937; line-height: 1.6; white-space: pre-wrap; font-family: 'Segoe UI', sans-serif;">${coverLetterText}</div>
+            <div style="background-color: #fcfcfc; border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px;">
+              ${parseMarkdownToHtml(coverLetterText)}
+            </div>
           </div>
         ` : ''}
 
@@ -192,7 +284,9 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
             <h3 style="color: #80397b; font-size: 18px; font-weight: bold; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; margin-bottom: 12px; font-family: 'Segoe UI', sans-serif;">
               📋 ${isFrench ? 'Description du Poste' : 'Job Description'}
             </h3>
-            <div style="background-color: #fafafa; border: 1px solid #e5e7eb; padding: 16px; border-radius: 8px; font-size: 12px; color: #6b7280; white-space: pre-wrap; font-family: 'Segoe UI', sans-serif;">${jdText}</div>
+            <div style="background-color: #fafafa; border: 1px solid #e5e7eb; padding: 16px; border-radius: 8px;">
+              ${parseMarkdownToHtml(jdText)}
+            </div>
           </div>
         ` : ''}
 
