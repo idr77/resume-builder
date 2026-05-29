@@ -142,18 +142,26 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
 
   const isFrench = language === 'fr';
 
+  // CDI/Freelance Salary & TJM Estimation and Simulation States
+  const [compCompanyType, setCompCompanyType] = useState<'startup' | 'scaleup' | 'pme' | 'esn' | 'grand_groupe' | ''>(application.companyType || '');
+  const [compLocation, setCompLocation] = useState(application.location || '');
+  const [compContractType, setCompContractType] = useState<'cdi' | 'freelance' | ''>(application.contractType || '');
+  const [compSalaryExpectation, setCompSalaryExpectation] = useState<number | undefined>(application.salaryExpectation);
+  const [compSalaryOffer, setCompSalaryOffer] = useState<number | undefined>(application.salaryOffer);
+  const [compTjmExpectation, setCompTjmExpectation] = useState<number | undefined>(application.tjmExpectation);
+  const [compTjmOffer, setCompTjmOffer] = useState<number | undefined>(application.tjmOffer);
+  const [compSalaryEstimateAiResult, setCompSalaryEstimateAiResult] = useState(application.salaryEstimateAiResult || '');
+  const [isEstimatingSalary, setIsEstimatingSalary] = useState(false);
+
   // Associated CV versions list
   const [cvVersions, setCvVersions] = useState<{ id: string; name: string; updatedAt: string; data: ResumeData }[]>([]);
-  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
 
   const loadCvVersions = async () => {
-    setIsLoadingVersions(true);
     try {
       const online = await apiService.checkHealth();
       if (online && apiService.isLoggedIn()) {
         const cloudVersions = await apiService.fetchVersions();
         setCvVersions(cloudVersions.map(v => ({ id: v.id, name: v.name, updatedAt: v.updatedAt, data: v.data })));
-        setIsLoadingVersions(false);
         return;
       }
     } catch (e) {
@@ -167,8 +175,6 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
       }
     } catch (e) {
       console.error("Failed to load resume history in ApplicationDetail", e);
-    } finally {
-      setIsLoadingVersions(false);
     }
   };
 
@@ -418,6 +424,16 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
     setAppStatus(application.status);
     setCoverLetterText(application.coverLetterText || '');
 
+    // Sync salary simulation states
+    setCompCompanyType(application.companyType || '');
+    setCompLocation(application.location || '');
+    setCompContractType(application.contractType || '');
+    setCompSalaryExpectation(application.salaryExpectation);
+    setCompSalaryOffer(application.salaryOffer);
+    setCompTjmExpectation(application.tjmExpectation);
+    setCompTjmOffer(application.tjmOffer);
+    setCompSalaryEstimateAiResult(application.salaryEstimateAiResult || '');
+
     // Reset activeStepId to the first step of the new application
     const steps = application.interviewSteps || [];
     const firstStepId = steps.length > 0 ? steps[0].id : null;
@@ -444,7 +460,15 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
     nextJd = jdText, 
     nextStatus = appStatus,
     nextAppNotes = appNotes,
-    nextCoverLetter = coverLetterText
+    nextCoverLetter = coverLetterText,
+    nextCompanyType = compCompanyType,
+    nextLocation = compLocation,
+    nextContractType = compContractType,
+    nextSalaryExpectation = compSalaryExpectation,
+    nextSalaryOffer = compSalaryOffer,
+    nextTjmExpectation = compTjmExpectation,
+    nextTjmOffer = compTjmOffer,
+    nextSalaryEstimateAiResult = compSalaryEstimateAiResult
   ) => {
     setSaveStatus('saving');
     try {
@@ -463,7 +487,15 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
         skillsDossierFileName: fileName,
         interviewSteps: updatedSteps,
         notes: nextAppNotes,
-        coverLetterText: nextCoverLetter
+        coverLetterText: nextCoverLetter,
+        companyType: nextCompanyType,
+        location: nextLocation,
+        contractType: nextContractType,
+        salaryExpectation: nextSalaryExpectation,
+        salaryOffer: nextSalaryOffer,
+        tjmExpectation: nextTjmExpectation,
+        tjmOffer: nextTjmOffer,
+        salaryEstimateAiResult: nextSalaryEstimateAiResult
       };
 
       onUpdate(updatedApp);
@@ -485,16 +517,67 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
     const hasJdChanged = jdText !== application.jobDescription;
     const hasAppNotesChanged = appNotes !== (application.notes || '');
     const hasCoverLetterChanged = coverLetterText !== (application.coverLetterText || '');
+    const hasCompanyTypeChanged = compCompanyType !== (application.companyType || '');
+    const hasLocationChanged = compLocation !== (application.location || '');
+    const hasContractTypeChanged = compContractType !== (application.contractType || '');
+    const hasSalaryExpectationChanged = compSalaryExpectation !== application.salaryExpectation;
+    const hasSalaryOfferChanged = compSalaryOffer !== application.salaryOffer;
+    const hasTjmExpectationChanged = compTjmExpectation !== application.tjmExpectation;
+    const hasTjmOfferChanged = compTjmOffer !== application.tjmOffer;
+    const hasSalaryEstimateAiResultChanged = compSalaryEstimateAiResult !== (application.salaryEstimateAiResult || '');
 
-    if (!hasNotesChanged && !hasDossierChanged && !hasJdChanged && !hasAppNotesChanged && !hasCoverLetterChanged) return;
+    if (
+      !hasNotesChanged && 
+      !hasDossierChanged && 
+      !hasJdChanged && 
+      !hasAppNotesChanged && 
+      !hasCoverLetterChanged &&
+      !hasCompanyTypeChanged &&
+      !hasLocationChanged &&
+      !hasContractTypeChanged &&
+      !hasSalaryExpectationChanged &&
+      !hasSalaryOfferChanged &&
+      !hasTjmExpectationChanged &&
+      !hasTjmOfferChanged &&
+      !hasSalaryEstimateAiResultChanged
+    ) return;
 
     const timer = setTimeout(() => {
       console.log("Auto-saving application tracker modifications...");
-      saveAllPendingChanges(notesText, dossierText, jdText, appStatus, appNotes, coverLetterText);
+      saveAllPendingChanges(
+        notesText,
+        dossierText,
+        jdText,
+        appStatus,
+        appNotes,
+        coverLetterText,
+        compCompanyType,
+        compLocation,
+        compContractType,
+        compSalaryExpectation,
+        compSalaryOffer,
+        compTjmExpectation,
+        compTjmOffer,
+        compSalaryEstimateAiResult
+      );
     }, 1500);
 
     return () => clearTimeout(timer);
-  }, [notesText, dossierText, jdText, appNotes, coverLetterText]);
+  }, [
+    notesText, 
+    dossierText, 
+    jdText, 
+    appNotes, 
+    coverLetterText, 
+    compCompanyType, 
+    compLocation, 
+    compContractType, 
+    compSalaryExpectation, 
+    compSalaryOffer, 
+    compTjmExpectation, 
+    compTjmOffer, 
+    compSalaryEstimateAiResult
+  ]);
 
   const updateApplication = (fields: Partial<JobApplication>) => {
     const updatedSteps = (application.interviewSteps || []).map(s => {
@@ -513,6 +596,14 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
       interviewSteps: updatedSteps,
       notes: appNotes,
       coverLetterText: coverLetterText,
+      companyType: compCompanyType,
+      location: compLocation,
+      contractType: compContractType,
+      salaryExpectation: compSalaryExpectation,
+      salaryOffer: compSalaryOffer,
+      tjmExpectation: compTjmExpectation,
+      tjmOffer: compTjmOffer,
+      salaryEstimateAiResult: compSalaryEstimateAiResult,
       ...fields
     };
     onUpdate(updated);
@@ -733,6 +824,117 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
       setAiError(err.message || 'An error occurred.');
     } finally {
       setLoadingStepId(null);
+    }
+  };
+
+  const handleGenerateSalaryEstimate = async () => {
+    setAiError('');
+    setIsEstimatingSalary(true);
+
+    try {
+      const online = await apiService.checkHealth();
+      const isCloudConnected = online && apiService.isLoggedIn();
+      const apiKey = localStorage.getItem('gemini_api_key');
+
+      if (!apiKey && !isCloudConnected) {
+        throw new Error(isFrench
+          ? 'Clé API Gemini manquante. Configurez votre clé ou connectez-vous au Cloud.'
+          : 'Missing Gemini API Key. Configure a key or connect to Cloud.');
+      }
+
+      const resumeDataRaw = (application.resumeDataUsed && Object.keys(application.resumeDataUsed).length > 0)
+        ? application.resumeDataUsed
+        : activeResumeData;
+
+      // Clean builder state variables to prevent bleeding
+      const { targetJobDescription, coverLetter, ...cleanedResumeData } = resumeDataRaw || {};
+
+      let resultText = '';
+
+      const systemInstruction = isFrench
+        ? "Vous êtes un consultant expert en rémunération, recrutement et marché du travail. Votre but est d'estimer avec précision la fourchette de salaire ou de TJM d'un candidat face à une offre d'emploi et de lui donner des conseils de négociation."
+        : "You are an expert compensation, recruitment, and labor market consultant. Your goal is to accurately estimate a candidate's salary or TJM range for a job offer and provide negotiation advice.";
+
+      const detailsPrompt = `
+        Entreprise : "${application.companyName}"
+        Type d'entreprise : "${compCompanyType || 'Non spécifié'}"
+        Localisation du poste : "${compLocation || 'Non spécifiée'}"
+        Intitulé du poste : "${application.roleTitle}"
+        Type de contrat envisagé : "${compContractType === 'cdi' ? 'CDI (Salarié)' : compContractType === 'freelance' ? 'Freelance (TJM)' : 'Non spécifié'}"
+        Description du poste : "${jdText}"
+        Attentes du candidat : ${compContractType === 'cdi' ? `${compSalaryExpectation || 0} € brut annuel` : `${compTjmExpectation || 0} €/jour TJM`}
+        Proposition de l'entreprise : ${compContractType === 'cdi' ? `${compSalaryOffer || 0} € brut annuel` : `${compTjmOffer || 0} €/jour TJM`}
+        CV du Candidat (JSON) : ${JSON.stringify(cleanedResumeData)}
+        Dossier de compétences : ${dossierText || 'Aucun document supplémentaire.'}
+
+        TÂCHE :
+        Fournissez une analyse ultra-complète et chiffrée structurée précisément de la manière suivante :
+
+        ### 📊 Estimation et Référence du Marché
+        - Fourchette de marché estimée pour ce poste à cet endroit géographique, selon le profil du candidat (Junior, Mid, Senior, Lead).
+        - Impact du type d'entreprise (${compCompanyType}) sur la grille salariale.
+
+        ### 🔍 Positionnement du Candidat (Forces & Faiblesses)
+        - Analyse de l'adéquation de ses compétences techniques, années d'expérience et dossier de compétences avec la rémunération cible.
+
+        ### ⚖️ Comparatif & Analyse Financière
+        ${compContractType === 'freelance' ? `
+        - Comparaison du TJM attendu (${compTjmExpectation} €) et proposé (${compTjmOffer} €) par rapport au marché.
+        - **Simulation Financière Détaillée** :
+          - Chiffre d'affaires mensuel brut estimé (sur une base de 18 jours travaillés par mois).
+          - Estimation des cotisations sociales et impôts sous statut de Micro-entreprise (Auto-entrepreneur) ou SASU en France.
+          - Simulation alternative en Portage Salarial (salaire net estimé à environ 45-50% du chiffre d'affaires).
+          - Revenu net disponible réel après toutes charges.
+        ` : `
+        - Comparaison du salaire attendu (${compSalaryExpectation} €) et proposé (${compSalaryOffer} €) par rapport à la grille estimée.
+        - Estimation du salaire net mensuel avant impôt sur le revenu.
+        `}
+
+        ### 💡 Stratégie de Négociation & Arguments
+        - Donnez 3 arguments clés concrets (STAR/faits chiffrés basés sur son CV) à avancer en entretien pour justifier les attentes salariales ou obtenir une augmentation.
+        - Tactiques spécifiques pour surmonter les objections de l'entreprise.
+
+        CONSIGNES STRICTES :
+        - Écrivez entièrement en ${isFrench ? 'Français' : 'English'}.
+        - Pas d'introduction polie ni de blabla inutile, démarrez directement avec les titres.
+        - Donnez des estimations de marché réalistes en vous basant sur les salaires/TJM réels de la tech/marché en 2026.
+      `;
+
+      if (isCloudConnected) {
+        resultText = await apiService.proxyLlm(systemInstruction, detailsPrompt, 'GEMINI');
+      } else {
+        resultText = await generateCoverLetterWithGemini(
+          apiKey!,
+          JSON.stringify(cleanedResumeData),
+          jdText || '',
+          language,
+          application.companyName,
+          application.roleTitle,
+          `INSTRUCTION GÉNÉRALE : ${detailsPrompt}`
+        );
+      }
+
+      setCompSalaryEstimateAiResult(resultText);
+      saveAllPendingChanges(
+        notesText,
+        dossierText,
+        jdText,
+        appStatus,
+        appNotes,
+        coverLetterText,
+        compCompanyType,
+        compLocation,
+        compContractType,
+        compSalaryExpectation,
+        compSalaryOffer,
+        compTjmExpectation,
+        compTjmOffer,
+        resultText
+      );
+    } catch (err: any) {
+      setAiError(err.message || 'An error occurred.');
+    } finally {
+      setIsEstimatingSalary(false);
     }
   };
 
@@ -1321,6 +1523,164 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
                 : "Select or add an interview step in the timeline to begin preparing."}
             </div>
           )}
+
+          {/* Compensation Simulator & AI Estimator */}
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4 rounded-lg shadow-sm transition-colors text-xs space-y-4">
+            <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-3">
+              <h3 className="text-sm font-bold text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
+                <Share2 size={15} className="text-indigo-500" />
+                {isFrench ? '💰 Simulateur & Estimateur Salarial IA' : '💰 Salary & AI TJM Simulator'}
+              </h3>
+              
+              <button
+                type="button"
+                onClick={handleGenerateSalaryEstimate}
+                disabled={isEstimatingSalary || !compContractType}
+                className="flex items-center gap-1 bg-indigo-600 text-white dark:bg-indigo-500 hover:opacity-90 px-3 py-1.5 rounded-full font-bold text-[10px] transition cursor-pointer disabled:opacity-50 disabled:bg-gray-200 dark:disabled:bg-gray-850 dark:disabled:text-gray-500"
+              >
+                {isEstimatingSalary ? (
+                  <><Loader2 size={12} className="animate-spin" /> {isFrench ? 'Analyse...' : 'Analyzing...'}</>
+                ) : (
+                  <><Sparkles size={12} /> {isFrench ? "Estimer avec l'IA" : 'Estimate with AI'}</>
+                )}
+              </button>
+            </div>
+
+            {/* Inputs Panel */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">
+                  {isFrench ? 'TYPE DE CONTRAT' : 'CONTRACT TYPE'}
+                </label>
+                <select
+                  value={compContractType}
+                  onChange={(e) => setCompContractType(e.target.value as any)}
+                  className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-955 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
+                >
+                  <option value="">-- {isFrench ? 'Sélectionner' : 'Select'} --</option>
+                  <option value="cdi">CDI</option>
+                  <option value="freelance">Freelance</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">
+                  {isFrench ? "TYPE D'ENTREPRISE" : 'COMPANY TYPE'}
+                </label>
+                <select
+                  value={compCompanyType}
+                  onChange={(e) => setCompCompanyType(e.target.value as any)}
+                  className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-955 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
+                >
+                  <option value="">-- {isFrench ? 'Sélectionner' : 'Select'} --</option>
+                  <option value="startup">Startup</option>
+                  <option value="scaleup">Scaleup</option>
+                  <option value="pme">PME</option>
+                  <option value="esn">ESN / ESN Digitale</option>
+                  <option value="grand_groupe">Grand Groupe</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">
+                  {isFrench ? 'LOCALISATION DU POSTE' : 'JOB LOCATION'}
+                </label>
+                <input
+                  type="text"
+                  value={compLocation}
+                  onChange={(e) => setCompLocation(e.target.value)}
+                  placeholder={isFrench ? 'ex: Paris, Remote...' : 'e.g. London, Remote...'}
+                  className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-955 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
+                />
+              </div>
+            </div>
+
+            {compContractType === 'cdi' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-gray-50 dark:bg-gray-950/40 rounded-lg border border-gray-150 dark:border-gray-850 animate-fade-in">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">
+                    {isFrench ? 'MES ATTENTES (ANNUEL BRUT €)' : 'MY EXPECTATIONS (ANNUAL GROSS €)'}
+                  </label>
+                  <input
+                    type="number"
+                    value={compSalaryExpectation || ''}
+                    onChange={(e) => setCompSalaryExpectation(e.target.value ? Number(e.target.value) : undefined)}
+                    placeholder="ex: 55000"
+                    className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-955 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">
+                    {isFrench ? "PROPOSITION DE L'ENTREPRISE (ANNUEL BRUT €)" : 'COMPANY OFFER (ANNUAL GROSS €)'}
+                  </label>
+                  <input
+                    type="number"
+                    value={compSalaryOffer || ''}
+                    onChange={(e) => setCompSalaryOffer(e.target.value ? Number(e.target.value) : undefined)}
+                    placeholder="ex: 52000"
+                    className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-955 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+              </div>
+            )}
+
+            {compContractType === 'freelance' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-gray-50 dark:bg-gray-950/40 rounded-lg border border-gray-150 dark:border-gray-850 animate-fade-in">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">
+                    {isFrench ? 'MON TJM SOUHAITÉ (€/JOUR)' : 'MY DESIRED TJM (€/DAY)'}
+                  </label>
+                  <input
+                    type="number"
+                    value={compTjmExpectation || ''}
+                    onChange={(e) => setCompTjmExpectation(e.target.value ? Number(e.target.value) : undefined)}
+                    placeholder="ex: 600"
+                    className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-955 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">
+                    {isFrench ? "PROPOSITION DE TJM DE L'ENTREPRISE (€/JOUR)" : 'COMPANY TJM OFFER (€/DAY)'}
+                  </label>
+                  <input
+                    type="number"
+                    value={compTjmOffer || ''}
+                    onChange={(e) => setCompTjmOffer(e.target.value ? Number(e.target.value) : undefined)}
+                    placeholder="ex: 550"
+                    className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-955 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* AI Estimation Result Panel */}
+            {compContractType ? (
+              <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-855">
+                <h4 className="font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-indigo-500" />
+                  {isFrench ? '🔮 Analyse Comparative & Estimation IA' : '🔮 AI Comparative Analysis & Valuation'}
+                </h4>
+
+                {compSalaryEstimateAiResult ? (
+                  <div className="bg-indigo-50/20 dark:bg-indigo-950/10 border border-indigo-100/40 dark:border-indigo-900/40 rounded-lg p-4 max-h-96 overflow-y-auto pr-2 scrollbar-thin transition-colors">
+                    <MarkdownRenderer content={compSalaryEstimateAiResult} />
+                  </div>
+                ) : (
+                  <div className="text-center py-6 bg-gray-50/30 rounded border border-dashed border-gray-200 dark:border-gray-800 text-gray-400 italic text-[10px]">
+                    {isFrench 
+                      ? "Renseignez vos attentes, le type d'entreprise et cliquez sur 'Estimer avec l'IA' pour générer une simulation de charges, un comparatif marché et des arguments de négociation personnalisés !"
+                      : "Fill in your expectations, the company type, and click 'Estimate with AI' to generate a full market audit, net income simulator, and custom negotiation arguments!"}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-4 bg-gray-50/30 rounded border border-dashed border-gray-200 dark:border-gray-800 text-gray-400 italic text-[10px]">
+                {isFrench 
+                  ? "Veuillez sélectionner un type de contrat (CDI ou Freelance) pour commencer la simulation."
+                  : "Please select a contract type (CDI or Freelance) to start the simulation."}
+              </div>
+            )}
+          </div>
 
           {/* Job Description editor/viewer */}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4 rounded-lg shadow-sm transition-colors text-xs space-y-2">

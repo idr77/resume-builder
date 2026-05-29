@@ -8,6 +8,7 @@ export interface SavedVersion {
   name: string;
   updatedAt: string;
   data: ResumeData;
+  isLocked?: boolean;
 }
 
 class ApiService {
