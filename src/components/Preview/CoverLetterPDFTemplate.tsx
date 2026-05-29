@@ -9,105 +9,105 @@ const styles = StyleSheet.create({
     fontFamily: 'Helvetica',
     fontSize: 10,
     backgroundColor: '#ffffff',
-    paddingHorizontal: 50,
-    paddingTop: 50,
-    paddingBottom: 50,
+    paddingHorizontal: 55,
+    paddingTop: 55,
+    paddingBottom: 55,
   },
   
-  // Header Cohesive with Resume
-  headerContainer: {
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#2b3643',
-    paddingBottom: 15,
-    marginBottom: 25,
-  },
-  name: {
-    fontSize: 26,
-    fontFamily: 'Helvetica-Bold',
-    color: '#2b3643',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  jobTitle: {
-    fontSize: 11,
-    color: '#555555',
-    letterSpacing: 2,
-    marginBottom: 8,
-  },
-  contactRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    fontSize: 8,
-    color: '#666666',
-  },
-  contactItem: {
-    fontFamily: 'Helvetica',
-  },
-  
-  // Letter Meta Data
+  // Classical Letter Layout
   metaContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 20,
   },
-  senderMeta: {
-    flexDirection: 'column',
-    gap: 2,
-  },
-  recipientMeta: {
+  senderBlock: {
     flexDirection: 'column',
     gap: 3,
-    alignItems: 'flex-end',
-    textAlign: 'right',
+    maxWidth: 220,
   },
-  metaLabelBold: {
+  senderName: {
+    fontSize: 12,
     fontFamily: 'Helvetica-Bold',
-    fontSize: 9,
-    color: '#333333',
+    color: '#1a202c',
   },
-  metaText: {
+  senderTitle: {
+    fontSize: 9.5,
+    fontFamily: 'Helvetica-Oblique',
+    color: '#4a5568',
+    marginBottom: 2,
+  },
+  senderText: {
     fontSize: 9,
-    color: '#555555',
+    color: '#4a5568',
   },
   
-  // Date and Subject
-  dateText: {
-    fontSize: 9,
-    color: '#555555',
-    marginBottom: 15,
+  recipientBlock: {
+    flexDirection: 'column',
+    gap: 3,
+    marginTop: 20,
+    alignItems: 'flex-end',
+    textAlign: 'right',
+    maxWidth: 220,
   },
+  recipientTitle: {
+    fontSize: 10,
+    fontFamily: 'Helvetica-Bold',
+    color: '#1a202c',
+  },
+  recipientText: {
+    fontSize: 9,
+    color: '#4a5568',
+  },
+
+  dateContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 25,
+  },
+  dateText: {
+    fontSize: 9.5,
+    color: '#4a5568',
+  },
+
   subjectContainer: {
-    marginBottom: 20,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#cbd5e1',
+    paddingBottom: 4,
+    marginBottom: 25,
   },
   subjectLabel: {
     fontFamily: 'Helvetica-Bold',
     fontSize: 10,
-    color: '#2b3643',
+    color: '#1a202c',
   },
   
   // Letter Body
   bodyContainer: {
     flexDirection: 'column',
-    gap: 12,
+    gap: 14,
   },
   bodyParagraph: {
-    fontSize: 9.5,
+    fontSize: 10,
     lineHeight: 1.5,
-    color: '#333333',
+    color: '#1a202c',
     textAlign: 'justify',
   },
   
   // Signature
   signatureContainer: {
-    marginTop: 30,
+    marginTop: 35,
     flexDirection: 'column',
-    gap: 2,
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  signatureGreeting: {
+    fontSize: 10,
+    color: '#4a5568',
   },
   signatureName: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 10,
-    color: '#2b3643',
+    fontSize: 10.5,
+    color: '#1a202c',
   }
 });
 
@@ -139,53 +139,48 @@ export default function CoverLetterPDFTemplate({ data }: Props) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Cohesive Header */}
-        <View style={styles.headerContainer}>
-          <Text style={styles.name}>{data.personalInfo.fullName}</Text>
-          {data.personalInfo.jobTitle && (
-            <Text style={styles.jobTitle}>{data.personalInfo.jobTitle.toUpperCase()}</Text>
-          )}
-          
-          <View style={styles.contactRow}>
-            {data.personalInfo.phone && (
-              <Text style={styles.contactItem}>{data.personalInfo.phone}</Text>
-            )}
-            {data.personalInfo.email && (
-              <Text style={styles.contactItem}>{data.personalInfo.email}</Text>
+        {/* Classical Sender & Recipient Header */}
+        <View style={styles.metaContainer}>
+          {/* Sender details on top left */}
+          <View style={styles.senderBlock}>
+            <Text style={styles.senderName}>{data.personalInfo.fullName}</Text>
+            {data.personalInfo.jobTitle && (
+              <Text style={styles.senderTitle}>{data.personalInfo.jobTitle}</Text>
             )}
             {data.personalInfo.location && (
-              <Text style={styles.contactItem}>{data.personalInfo.location}</Text>
+              <Text style={styles.senderText}>{data.personalInfo.location}</Text>
+            )}
+            {data.personalInfo.phone && (
+              <Text style={styles.senderText}>{data.personalInfo.phone}</Text>
+            )}
+            {data.personalInfo.email && (
+              <Text style={styles.senderText}>{data.personalInfo.email}</Text>
             )}
             {data.personalInfo.linkedin && (
-              <Text style={styles.contactItem}>LinkedIn: {data.personalInfo.linkedin}</Text>
+              <Text style={styles.senderText}>LinkedIn: {data.personalInfo.linkedin}</Text>
             )}
             {data.personalInfo.portfolio && (
-              <Text style={styles.contactItem}>Web: {data.personalInfo.portfolio}</Text>
+              <Text style={styles.senderText}>Web: {data.personalInfo.portfolio}</Text>
             )}
           </View>
-        </View>
-
-        {/* Sender & Recipient Meta block */}
-        <View style={styles.metaContainer}>
-          <View style={styles.senderMeta}>
-            <Text style={styles.metaLabelBold}>{data.personalInfo.fullName}</Text>
-            <Text style={styles.metaText}>{data.personalInfo.location}</Text>
-          </View>
           
-          <View style={styles.recipientMeta}>
-            <Text style={styles.metaLabelBold}>
-              {isFrench ? "Responsable du recrutement" : "Hiring Manager"}
+          {/* Recipient on top right */}
+          <View style={styles.recipientBlock}>
+            <Text style={styles.recipientTitle}>
+              {isFrench ? "À l'attention de l'équipe de recrutement" : "To the Hiring Team"}
             </Text>
-            <Text style={styles.metaText}>
+            <Text style={styles.recipientText}>
               {isFrench ? "Département des Ressources Humaines" : "Human Resources Department"}
             </Text>
           </View>
         </View>
 
-        {/* Date */}
-        <Text style={styles.dateText}>
-          {isFrench ? `Fait le ${currentDate}` : `Date: ${currentDate}`}
-        </Text>
+        {/* Date block on the right */}
+        <View style={styles.dateContainer}>
+          <Text style={styles.dateText}>
+            {isFrench ? `Le ${currentDate}` : `Date: ${currentDate}`}
+          </Text>
+        </View>
 
         {/* Subject */}
         <View style={styles.subjectContainer}>
@@ -199,9 +194,9 @@ export default function CoverLetterPDFTemplate({ data }: Props) {
           ))}
         </View>
 
-        {/* Signature */}
+        {/* Signature at bottom right */}
         <View style={styles.signatureContainer}>
-          <Text style={styles.metaText}>
+          <Text style={styles.signatureGreeting}>
             {isFrench ? "Cordialement," : "Sincerely,"}
           </Text>
           <Text style={styles.signatureName}>{data.personalInfo.fullName}</Text>

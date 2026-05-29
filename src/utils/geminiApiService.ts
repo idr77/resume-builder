@@ -404,12 +404,7 @@ export const generateCoverLetterWithGemini = async (
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
     const langInstruction = language === 'fr' ? 'French' : 'English';
     
-    // Dynamically calculate the current date in the correct language format
-    const currentDate = new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+
 
     let personalInfo: any = {};
     try {
@@ -448,20 +443,17 @@ export const generateCoverLetterWithGemini = async (
      - **Vary Sentence Structure (Burstiness & Perplexity)**: Mix short, punchy sentences with longer ones. Use active verbs. Avoid repetitive starting phrases (like "J'ai...", "J'ai...", "Je...").
      - **Humble & Authentic Tone**: Write in a direct, professional, mature, and humble voice. Write as a real person talking to another professional. No corporate speak or over-marketing. Be concise and write with clear, simple vocabulary.
 
-  3. **STRUCTURE & FORMATTING**:
-     - Return ONLY the final letter text. Use standard formal letter layout with line breaks.
-     - Do NOT use Markdown titles, bold titles like "# Motivation Letter", or decorative headers.
-     - **SENDER HEADER**: Place the candidate's contact info at the very top:
-       Name: ${personalInfo.fullName || 'Candidate'}
-       Job Title: ${personalInfo.jobTitle || ''}
-       Email: ${personalInfo.email || ''}
-       Phone: ${personalInfo.phone || ''}
-       Location: ${personalInfo.location || ''}
-       ${personalInfo.linkedin ? `LinkedIn: ${personalInfo.linkedin}` : ''}
-       ${personalInfo.portfolio ? `Portfolio: ${personalInfo.portfolio}` : ''}
-     - **FORMAL DATE**: Write the current date: "**${currentDate}**" aligned on the right before starting the body of the letter.
-     - **RECIPIENT HEADER**: Address specifically "To the Hiring Team at ${companyName || 'the company'}" (or in French: "À l'attention de l'équipe de recrutement de ${companyName || 'l\'entreprise'}").
-     - **ZERO PLACEHOLDERS**: All information must be fully rendered using the candidate's actual details. Never output brackets like \`[Date]\` or \`[Nom du recruteur]\`.
+  3. **STRICT BODY-ONLY FORMATTING (CRITICAL)**:
+     - **Do NOT generate any sender contact headers at the top of the text.**
+     - **Do NOT generate a date line or location date.**
+     - **Do NOT generate any recipient headers (e.g., "À l'attention de...").**
+     - **Do NOT generate a Subject line (e.g., "Objet : ...").**
+     - The PDF renderer already places these sender, recipient, date, and subject blocks automatically! You must strictly avoid duplicating them.
+     - **Start directly with the professional greeting** (e.g., "Madame, Monsieur," or "Dear Hiring Team,").
+     - Then write the body paragraphs of the letter.
+     - **End naturally with a formal closing salutation** (e.g., "Cordialement," or "Sincerely,") followed by the candidate's name on a new line (e.g. "${personalInfo.fullName || 'Candidate'}").
+     - Return ONLY this body text, formatted cleanly. Use standard paragraphs separated by simple newlines. Do NOT add any markdown headers, bold titles, or introduction/explanation blocks.
+     - **ZERO PLACEHOLDERS**: Never output bracket placeholders like \`[Date]\` or \`[Nom]\`.
 
   Job Description:
   ${jobDescription || 'General application'}
