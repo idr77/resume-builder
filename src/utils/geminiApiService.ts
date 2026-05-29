@@ -426,36 +426,46 @@ export const generateCoverLetterWithGemini = async (
       : '';
 
     const prompt = `
-  Role: You are an expert career coach helping a candidate write a compelling, professional cover letter.
-  Task: Write a complete motivation letter based on the provided JSON Resume and Job Description.
+  Role: You are an exceptionally skilled, senior professional copywriter and career advisor.
+  Task: Write a highly personalized, custom cover letter for the candidate that feels 100% human-written, authentic, and naturally persuasive.
   Language: ${langInstruction}.
   Context:${companySection}${roleSection}
   ${dossierSection}
-  
-  Constraints:
-  1. Return ONLY the letter text, formatted cleanly. Use standard formal letter structure.
-  2. Do not use Markdown headings like # Cover Letter, but you can use newlines for paragraphs.
-  
-  3. **FORMAL SENDER HEADER (MANDATORY)**: At the very top of the letter, write the candidate's actual contact information from the CV:
-     - Name: ${personalInfo.fullName || 'Candidate'}
-     - Job Title: ${personalInfo.jobTitle || ''}
-     - Email: ${personalInfo.email || ''}
-     - Phone: ${personalInfo.phone || ''}
-     - Location: ${personalInfo.location || ''}
-     ${personalInfo.linkedin ? `- LinkedIn: ${personalInfo.linkedin}` : ''}
-     ${personalInfo.portfolio ? `- Portfolio: ${personalInfo.portfolio}` : ''}
-     
-  4. **FORMAL DATE (MANDATORY)**: Place the current date exactly: "**${currentDate}**" aligned on the right before starting the body of the letter. Never use bracket placeholders like [Date] or [Date du jour].
-  
-  5. **FORMAL RECIPIENT HEADER (MANDATORY)**: Address the letter specifically "To the Hiring Team at ${companyName || 'the company'}" (or in French: "À l'attention de l'équipe de recrutement de ${companyName || 'l\'entreprise'}"). Do NOT use placeholders like [Hiring Manager] or [Nom du recruteur].
-  
-  6. **ZERO PLACEHOLDERS STRICT POLICY**: Do NOT include any bracketed text or text placeholders (e.g. \`[Date]\`, \`[Nom]\`, \`[Hiring Manager]\`, \`[Hiring Manager Name]\`, \`[Nom du recruteur]\`, \`[Adresse]\`, \`[Email]\`, \`[Téléphone]\`). All header information must be fully rendered using the candidate's actual details provided above.
-  
-  7. Make sure it directly addresses the requirements in the job description while highlighting the candidate's best relevant experiences.
-  
+
+  CONSTRAINTS & RULES (CRITICAL):
+
+  1. **RELEVANCY FILTERING (MANDATORY)**:
+     - First, read the Job Description and identify the core technologies, competencies, and primary theme.
+     - Scan the Candidate's Resume and Dossier of experiences.
+     - **Only mention and detail experiences, projects, and skills that are DIRECTLY relevant to the Job Description theme.**
+     - **Strictly ignore and exclude unrelated experiences.** (For example: if the job targets Java Application Development, do NOT mention low-level hardware C development, electronics, or unrelated frontend tasks from the CV. Focus entirely on Java, backend APIs, design patterns, and enterprise databases.)
+     - Do not list skills just for the sake of listing them. Select 1 or 2 main professional achievements that demonstrate fit and elaborate on them simply.
+
+  2. **HUMAN-WRITTEN FEEL & AI DETECTOR EVASION (CRITICAL)**:
+     - **Avoid AI Clichés & Buzzwords**: Do NOT use typical over-used AI writing patterns, transition words, or marketing hyperbole.
+       - *Forbidden terms in French*: "C'est avec un grand enthousiasme", "C'est avec un réel enthousiasme", "Je suis ravi de", "Je suis particulièrement ravi", "En tant que passionné", "De plus", "En conclusion", "Mon profil correspond parfaitement", "En effet", "Je suis convaincu que", "Fort de mon expérience", "Relever ce défi", "Synergie", "Impact significatif", "Permettez-moi de", "A travers cette lettre", "Au sein de votre".
+       - *Forbidden terms in English*: "It is with great enthusiasm", "I am thrilled to apply", "Furthermore", "In conclusion", "As a passionate", "My background aligns perfectly", "Indeed", "I am confident that", "Leverage", "Significantly impact", "Excited to join", "Testament to".
+     - **Vary Sentence Structure (Burstiness & Perplexity)**: Mix short, punchy sentences with longer ones. Use active verbs. Avoid repetitive starting phrases (like "J'ai...", "J'ai...", "Je...").
+     - **Humble & Authentic Tone**: Write in a direct, professional, mature, and humble voice. Write as a real person talking to another professional. No corporate speak or over-marketing. Be concise and write with clear, simple vocabulary.
+
+  3. **STRUCTURE & FORMATTING**:
+     - Return ONLY the final letter text. Use standard formal letter layout with line breaks.
+     - Do NOT use Markdown titles, bold titles like "# Motivation Letter", or decorative headers.
+     - **SENDER HEADER**: Place the candidate's contact info at the very top:
+       Name: ${personalInfo.fullName || 'Candidate'}
+       Job Title: ${personalInfo.jobTitle || ''}
+       Email: ${personalInfo.email || ''}
+       Phone: ${personalInfo.phone || ''}
+       Location: ${personalInfo.location || ''}
+       ${personalInfo.linkedin ? `LinkedIn: ${personalInfo.linkedin}` : ''}
+       ${personalInfo.portfolio ? `Portfolio: ${personalInfo.portfolio}` : ''}
+     - **FORMAL DATE**: Write the current date: "**${currentDate}**" aligned on the right before starting the body of the letter.
+     - **RECIPIENT HEADER**: Address specifically "To the Hiring Team at ${companyName || 'the company'}" (or in French: "À l'attention de l'équipe de recrutement de ${companyName || 'l\'entreprise'}").
+     - **ZERO PLACEHOLDERS**: All information must be fully rendered using the candidate's actual details. Never output brackets like \`[Date]\` or \`[Nom du recruteur]\`.
+
   Job Description:
   ${jobDescription || 'General application'}
-  
+
   Resume JSON:
   ${resumeJson}
     `;
