@@ -99,7 +99,11 @@ export const extractTargetJobTitle = (jdText: string): string => {
 export const analyzeResumeMatch = (resumeData: ResumeData, extraKeywords: string[] = []): OptimizationResult => {
   const jdText = resumeData.targetJobDescription || '';
   const baseTargetKeywords = extractJDKeywords(jdText);
-  const targetKeywords = Array.from(new Set([...baseTargetKeywords, ...extraKeywords]));
+  // If AI keywords have been extracted, use them exclusively as the target keywords list.
+  // Otherwise, fallback to the basic dictionary-extracted keywords.
+  const targetKeywords = extraKeywords.length > 0
+    ? extraKeywords
+    : baseTargetKeywords;
   const language = resumeData.language;
 
   // 1. Title Match Analysis

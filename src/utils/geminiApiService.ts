@@ -268,11 +268,16 @@ export const extractKeywordsWithGemini = async (
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
   
   const prompt = `
-Task: Extract key skills, technical keywords, and soft skills from the following job description.
-Constraints:
-1. ONLY return a raw JSON array of strings: ["keyword1", "keyword2"]. No markdown formatting, no comments.
-2. Extract the most important and representative terms. Keep phrases if they represent a single concept (e.g. "project management").
-3. Language: ${language === 'fr' ? 'French' : 'English'}.
+Task: Analyze the following job description and extract a highly refined list of key technical stacks, methodologies, and core soft skills.
+
+CONSTRAINTS & RULES (CRITICAL):
+1. **Target Size**: Extract between 8 and 15 keywords max. Never exceed 20 keywords.
+2. **High-Level Core Skills Only**: List only the main technologies, frameworks, or core concepts. Do NOT list granular sub-features, libraries, or sub-methods.
+   - YES: "Java", "React", "Node.js", "CI/CD", "Docker", "SQL"
+   - NO: "Java Streams", "Java Lambdas", "Java Multithreading", "React state", "React Hooks", "React Router", "Node.js cluster"
+3. **Consolidation**: Group similar tools into their main parent framework or category unless a tool is specifically emphasized as a mandatory hard skill.
+4. **Formatting**: Return ONLY a raw valid JSON array of strings, e.g. ["React", "TypeScript", "Node.js", "Java", "Docker", "Agile"]. No markdown wrapping, no comments, no backticks.
+5. **Language**: Return the keywords in the exact language of the job description (${language === 'fr' ? 'French' : 'English'}).
 
 Job Description:
 ${jobDescription}
@@ -285,11 +290,21 @@ ${jobDescription}
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1 } })
     });
     if (!response.ok) throw new Error('Failed to extract keywords');
-    let text = (await response.json()).candidates?.[0]?.content?.parts?.[0]?.text || '[]';
-    text = text.replace(/^```json\n?/i, '').replace(/\n?```$/i, '').trim();
-    return JSON.parse(text);
+    const responseData = await response.json();
+    const text = responseData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+    
+    // Robust parsing: Find the first '[' and last ']' to extract the JSON array safely
+    const startIdx = text.indexOf('[');
+    const endIdx = text.lastIndexOf(']');
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      const cleanJson = text.slice(startIdx, endIdx + 1);
+      return JSON.parse(cleanJson);
+    }
+    
+    const cleaned = text.replace(/^```json\n?|```$/g, '').trim();
+    return JSON.parse(cleaned);
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
+    console.error("Gemini API Error in extractKeywords:", error);
     return [];
   }
 };

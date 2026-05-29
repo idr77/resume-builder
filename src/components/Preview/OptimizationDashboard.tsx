@@ -131,15 +131,33 @@ export default function OptimizationDashboard({ data, onChange, result, setAiKey
 
       if (isCloudConnected) {
         // Secure call proxied through AI Gateway
-        const systemPrompt = "Vous êtes un expert en recrutement ATS.";
-        const userPrompt = `Analysez la description de poste ci-dessous et extrayez une liste de mots-clés techniques, technologiques et soft skills essentiels pour passer les filtres ATS. Retournez la réponse UNIQUEMENT sous forme de tableau de chaînes JSON brut, sans formatage markdown (ex: ["React", "Python", "Gestion de projet"]).
-Description de poste : ${data.targetJobDescription}`;
+        const systemPrompt = "Vous êtes un expert en recrutement ATS spécialisé dans le ciblage de compétences de haut niveau.";
+        const userPrompt = `Analysez la description de poste ci-dessous et extrayez une liste de mots-clés (hard et soft skills) essentiels pour passer les filtres ATS.
+        
+        CONSIGNES STRICTES :
+        1. **Taille de la liste** : Extrayez entre 8 et 15 mots-clés maximum (20 max).
+        2. **Compétences principales de haut niveau** : Listez uniquement les technologies et concepts majeurs. Bannissez absolument les sous-méthodes, sous-fonctionnalités ou détails granulaires.
+           - OUI : "Java", "React", "Node.js", "CI/CD", "Docker", "SQL"
+           - NON : "Java Streams", "Java Lambdas", "Java Multithreading", "React state", "React Hooks", "React Router", "Node.js cluster"
+        3. **Langue** : Rédigez les mots-clés dans la même langue que l'offre d'emploi.
+        4. **Format** : Retournez UNIQUEMENT un tableau de chaînes de caractères JSON valide brut, sans aucun formatage Markdown ni explications (ex : ["React", "TypeScript", "Node.js"]).
+
+        Description de poste : ${data.targetJobDescription}`;
         
         let response = await apiService.proxyLlm(systemPrompt, userPrompt, 'GEMINI');
-        if (response.startsWith('```')) {
-          response = response.replace(/^```json\n?|```$/g, '').trim();
+        
+        // Robust JSON parsing fallback
+        const startIdx = response.indexOf('[');
+        const endIdx = response.lastIndexOf(']');
+        if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+          const cleanJson = response.slice(startIdx, endIdx + 1);
+          keywords = JSON.parse(cleanJson);
+        } else {
+          if (response.startsWith('```')) {
+            response = response.replace(/^```json\n?|```$/g, '').trim();
+          }
+          keywords = JSON.parse(response);
         }
-        keywords = JSON.parse(response);
       } else {
         // Fallback to direct client
         keywords = await extractKeywordsWithGemini(apiKey!, data.targetJobDescription || '', lang);
@@ -147,6 +165,7 @@ Description de poste : ${data.targetJobDescription}`;
 
       setAiKeywords(keywords);
     } catch (e) {
+      console.error("Failed to extract keywords:", e);
       alert(lang === 'fr' ? "Échec de l'extraction des mots-clés." : "Extraction failed.");
     } finally {
       setIsExtracting(false);
