@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { JobApplication, InterviewStep, ApplicationStatus } from '../../types/tracker';
 import type { ResumeData } from '../../types/resume';
-import { generateInterviewPrepWithGemini, generateCoverLetterWithGemini } from '../../utils/geminiApiService';
+import { generateInterviewPrepWithGemini, generateCoverLetterWithGemini, generateAtsAdviceWithGemini } from '../../utils/geminiApiService';
 import { apiService } from '../../utils/apiService';
 import { ArrowLeft, Plus, Trash2, Sparkles, Loader2, Calendar, FileText, CheckCircle, Clock, XCircle, Save, FileUp, Copy, Share2 } from 'lucide-react';
 import MarkdownRenderer from '../Common/MarkdownRenderer';
@@ -906,14 +906,10 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
       if (isCloudConnected) {
         resultText = await apiService.proxyLlm(systemInstruction, detailsPrompt, 'GEMINI');
       } else {
-        resultText = await generateCoverLetterWithGemini(
+        resultText = await generateAtsAdviceWithGemini(
           apiKey!,
-          JSON.stringify(cleanedResumeData),
-          jdText || '',
-          language,
-          application.companyName,
-          application.roleTitle,
-          `INSTRUCTION GÉNÉRALE : ${detailsPrompt}`
+          systemInstruction,
+          detailsPrompt
         );
       }
 
