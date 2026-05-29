@@ -722,8 +722,15 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
       if (isCloudConnected) {
         // Secures calls via Backend Proxy Gateway (Uses Server Global Key or User Decrypted Key)
         const systemInstruction = isFrench
-          ? "Vous êtes un coach en recrutement expert. Rédigez une lettre de motivation complète, percutante et professionnelle."
-          : "You are an expert recruitment coach. Generate a complete, compelling, and professional cover letter.";
+          ? "Vous êtes un coach en recrutement expert. Rédigez une lettre de motivation complète, percutante et professionnelle avec des en-têtes réels."
+          : "You are an expert recruitment coach. Generate a complete, compelling, and professional cover letter with real headers.";
+
+        const currentDate = new Date().toLocaleDateString(isFrench ? 'fr-FR' : 'en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+
         const userPrompt = `
           Entreprise cible : "${application.companyName || 'Non spécifiée'}"
           Poste cible : "${application.roleTitle || 'Non spécifié'}"
@@ -731,12 +738,27 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
           Offre d'emploi : ${jdText || 'Non spécifiée'}
           Notes supplémentaires / Dossier de compétences : ${dossierText || 'Aucun document supplémentaire.'}
 
-          CONSIGNES DE RÉDACTION :
+          CONSIGNES DE RÉDACTION ET D'EN-TÊTE :
           - Langue : Rédigez entièrement en ${isFrench ? 'Français' : 'Anglais'}.
           - Retournez UNIQUEMENT le texte de la lettre, formaté proprement avec des paragraphes bien espacés (structure formelle).
           - Ne mettez PAS de titre Markdown comme '# Lettre de Motivation' ou '# Cover Letter'.
-          - Utilisez des placeholders classiques comme [Date], [Nom du recruteur] si nécessaire, et intégrez les détails du candidat (nom, prénom) déduits du CV.
-          - Alignez la lettre sur les exigences de l'offre d'emploi tout en valorisant les meilleures réalisations du candidat issues du CV et du dossier de compétences.
+          
+          - **EN-TÊTE EXPÉDITEUR FORMEL (OBLIGATOIRE)** : Tout en haut de la lettre, écrivez les coordonnées réelles du candidat d'après la section 'personalInfo' de son CV. Affichez précisément :
+            Nom complet : ${cleanedResumeData.personalInfo?.fullName || ''}
+            Titre : ${cleanedResumeData.personalInfo?.jobTitle || ''}
+            Email : ${cleanedResumeData.personalInfo?.email || ''}
+            Téléphone : ${cleanedResumeData.personalInfo?.phone || ''}
+            Localisation : ${cleanedResumeData.personalInfo?.location || ''}
+            ${cleanedResumeData.personalInfo?.linkedin ? `LinkedIn : ${cleanedResumeData.personalInfo.linkedin}` : ''}
+            ${cleanedResumeData.personalInfo?.portfolio ? `Portfolio : ${cleanedResumeData.personalInfo.portfolio}` : ''}
+            
+          - **DATE FORMELLE (OBLIGATOIRE)** : Insérez la date exactement : "**${currentDate}**" tout en haut à droite avant le début de la lettre. N'utilisez JAMAIS de placeholder de date.
+          
+          - **EN-TÊTE DESTINATAIRE FORMEL (OBLIGATOIRE)** : Indiquez "À l'attention de l'équipe de recrutement de ${application.companyName || 'l\'entreprise'}" (ou "Dear Hiring Team at ${application.companyName || 'the company'}"). N'utilisez jamais de crochets.
+          
+          - **ZÉRO PLACEHOLDER DANS TOUTE LA LETTRE** : Il est STRICTEMENT INTERDIT d'inclure des crochets ou des placeholders comme \`[Date]\`, \`[Nom du recruteur]\`, \`[Nom de l'entreprise]\`, \`[Adresse]\`, \`[Téléphone]\`, \`[Email]\`, \`[Nom]\`. Toutes les informations d'en-tête et de salutation doivent être rédigées et complétées avec les coordonnées réelles indiquées ci-dessus.
+          
+          - Alignez le contenu de la lettre sur les exigences de l'offre d'emploi tout en valorisant les meilleures réalisations du candidat issues du CV et du dossier de compétences.
         `;
         letter = await apiService.proxyLlm(systemInstruction, userPrompt, 'GEMINI');
       } else {

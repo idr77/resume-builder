@@ -361,6 +361,21 @@ export const generateCoverLetterWithGemini = async (
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
     const langInstruction = language === 'fr' ? 'French' : 'English';
     
+    // Dynamically calculate the current date in the correct language format
+    const currentDate = new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    let personalInfo: any = {};
+    try {
+      const parsed = JSON.parse(resumeJson);
+      personalInfo = parsed.personalInfo || {};
+    } catch (e) {
+      console.warn("Failed to parse resume JSON in generateCoverLetterWithGemini", e);
+    }
+    
     const companySection = companyName ? `\n- Target Company: "${companyName}"` : '';
     const roleSection = roleTitle ? `\n- Target Role Title: "${roleTitle}"` : '';
     const dossierSection = skillsDossierText && skillsDossierText.trim()
@@ -373,11 +388,27 @@ export const generateCoverLetterWithGemini = async (
   Language: ${langInstruction}.
   Context:${companySection}${roleSection}
   ${dossierSection}
+  
   Constraints:
   1. Return ONLY the letter text, formatted cleanly. Use standard formal letter structure.
   2. Do not use Markdown headings like # Cover Letter, but you can use newlines for paragraphs.
-  3. Include placeholders like [Date], [Hiring Manager Name] if needed, but infer details (like the user's name) from the JSON resume.
-  4. Make sure it directly addresses the requirements in the job description while highlighting the candidate's best relevant experiences.
+  
+  3. **FORMAL SENDER HEADER (MANDATORY)**: At the very top of the letter, write the candidate's actual contact information from the CV:
+     - Name: ${personalInfo.fullName || 'Candidate'}
+     - Job Title: ${personalInfo.jobTitle || ''}
+     - Email: ${personalInfo.email || ''}
+     - Phone: ${personalInfo.phone || ''}
+     - Location: ${personalInfo.location || ''}
+     ${personalInfo.linkedin ? `- LinkedIn: ${personalInfo.linkedin}` : ''}
+     ${personalInfo.portfolio ? `- Portfolio: ${personalInfo.portfolio}` : ''}
+     
+  4. **FORMAL DATE (MANDATORY)**: Place the current date exactly: "**${currentDate}**" aligned on the right before starting the body of the letter. Never use bracket placeholders like [Date] or [Date du jour].
+  
+  5. **FORMAL RECIPIENT HEADER (MANDATORY)**: Address the letter specifically "To the Hiring Team at ${companyName || 'the company'}" (or in French: "À l'attention de l'équipe de recrutement de ${companyName || 'l\'entreprise'}"). Do NOT use placeholders like [Hiring Manager] or [Nom du recruteur].
+  
+  6. **ZERO PLACEHOLDERS STRICT POLICY**: Do NOT include any bracketed text or text placeholders (e.g. \`[Date]\`, \`[Nom]\`, \`[Hiring Manager]\`, \`[Hiring Manager Name]\`, \`[Nom du recruteur]\`, \`[Adresse]\`, \`[Email]\`, \`[Téléphone]\`). All header information must be fully rendered using the candidate's actual details provided above.
+  
+  7. Make sure it directly addresses the requirements in the job description while highlighting the candidate's best relevant experiences.
   
   Job Description:
   ${jobDescription || 'General application'}
