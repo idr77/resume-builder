@@ -868,6 +868,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
         Proposition de l'entreprise : ${compContractType === 'cdi' ? `${compSalaryOffer || 0} € brut annuel` : `${compTjmOffer || 0} €/jour TJM`}
         CV du Candidat (JSON) : ${JSON.stringify(cleanedResumeData)}
         Dossier de compétences : ${dossierText || 'Aucun document supplémentaire.'}
+        Notes générales de la candidature : ${appNotes || 'Aucune note générale.'}
 
         TÂCHE :
         Fournissez une analyse ultra-complète et chiffrée structurée précisément de la manière suivante :
@@ -1481,7 +1482,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
                     placeholder={isFrench ? "- Vos questions prévues...\n- Réponses du recruteur...\n- Salaire évoqué : 65k...\n- Feedback : positif" : "- Questions to prepare...\n- Interviewer answers...\n- Budget discuss: 65k...\n- Feedback: Positive"}
                   />
                 ) : (
-                  <div className="w-full h-32 p-3 overflow-y-auto border border-gray-200 dark:border-gray-800 dark:bg-gray-955 dark:text-gray-300 rounded text-xs leading-relaxed bg-gray-50/20 pr-2">
+                  <div className="w-full h-32 p-3 overflow-y-auto border border-gray-200 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 rounded text-xs leading-relaxed bg-gray-50/20 pr-2">
                     {notesText ? <MarkdownRenderer content={notesText} /> : <span className="text-gray-400 italic">{isFrench ? 'Aucune note rédigée.' : 'No notes written.'}</span>}
                   </div>
                 )}
@@ -1566,7 +1567,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
                 <select
                   value={compContractType}
                   onChange={(e) => setCompContractType(e.target.value as any)}
-                  className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-955 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
+                  className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
                 >
                   <option value="">-- {isFrench ? 'Sélectionner' : 'Select'} --</option>
                   <option value="cdi">CDI</option>
@@ -1581,7 +1582,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
                 <select
                   value={compCompanyType}
                   onChange={(e) => setCompCompanyType(e.target.value as any)}
-                  className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-955 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
+                  className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
                 >
                   <option value="">-- {isFrench ? 'Sélectionner' : 'Select'} --</option>
                   <option value="startup">Startup</option>
@@ -1601,7 +1602,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
                   value={compLocation}
                   onChange={(e) => setCompLocation(e.target.value)}
                   placeholder={isFrench ? 'ex: Paris, Remote...' : 'e.g. London, Remote...'}
-                  className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-955 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
+                  className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
                 />
               </div>
             </div>
@@ -1617,7 +1618,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
                     value={compSalaryExpectation || ''}
                     onChange={(e) => setCompSalaryExpectation(e.target.value ? Number(e.target.value) : undefined)}
                     placeholder="ex: 55000"
-                    className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-955 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
+                    className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
                   />
                 </div>
                 <div>
@@ -1629,7 +1630,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
                     value={compSalaryOffer || ''}
                     onChange={(e) => setCompSalaryOffer(e.target.value ? Number(e.target.value) : undefined)}
                     placeholder="ex: 52000"
-                    className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-955 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
+                    className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
                   />
                 </div>
               </div>
@@ -1646,7 +1647,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
                     value={compTjmExpectation || ''}
                     onChange={(e) => setCompTjmExpectation(e.target.value ? Number(e.target.value) : undefined)}
                     placeholder="ex: 600"
-                    className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-955 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
+                    className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
                   />
                 </div>
                 <div>
@@ -1658,7 +1659,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
                     value={compTjmOffer || ''}
                     onChange={(e) => setCompTjmOffer(e.target.value ? Number(e.target.value) : undefined)}
                     placeholder="ex: 550"
-                    className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-955 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
+                    className="w-full p-2 bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-indigo-500 transition-colors"
                   />
                 </div>
               </div>

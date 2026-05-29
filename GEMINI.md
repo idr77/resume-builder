@@ -22,20 +22,23 @@ Controlled Components: Forms must be managed predictably using React State or a 
 3. Technical Standards & Stack
    Styling: Tailwind CSS only. Favor utility classes; avoid arbitrary values unless absolutely necessary.
 
-PDF Generation: react-pdf/renderer is the only authorized library for export. Using screenshots, canvas, or images for PDF generation is strictly prohibited.
+   Dark Mode Contrast & Accessibility:
+   - All input fields, selectors, buttons, and text fields must have explicitly defined light/dark background and text colors to prevent illegibility (e.g., avoiding "white text on white background" or "dark text on dark background" in dark mode).
+   - Ensure classes like `bg-white dark:bg-gray-850 text-gray-900 dark:text-gray-100` or `dark:bg-gray-950` are comprehensively and cleanly paired.
+   - Verify readability of all inputs, cards, and text interfaces under both light and dark themes.
 
-ATS Compliance:
+   PDF Generation: react-pdf/renderer is the only authorized library for export. Using screenshots, canvas, or images for PDF generation is strictly prohibited.
 
-Flat or simple hierarchical data structures.
+   ATS Compliance:
 
-No hidden text, zero-pixel fonts, or "white text" hacks.
+   Flat or simple hierarchical data structures.
 
-Mandatory: Must produce a selectable text layer in the final PDF.
+   No hidden text, zero-pixel fonts, or "white text" hacks.
+
+   Mandatory: Must produce a selectable text layer in the final PDF.
 
 4. Testing & Quality Assurance
    Unit Testing: Every new feature (calculation logic, parsing helpers, date formatters) must include unit tests using Vitest.
-
-Component Integrity: Critical components (especially the PDF renderer) must be tested to ensure data maps correctly to the UI.
 
 Non-Regression: Before pushing changes, verify that:
 
