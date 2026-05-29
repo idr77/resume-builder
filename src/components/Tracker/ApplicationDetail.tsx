@@ -189,7 +189,8 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
     if (!window.confirm(confirmMsg)) return;
 
     updateApplication({
-      resumeDataUsed: activeResumeData
+      resumeDataUsed: activeResumeData,
+      resumeVersionId: 'active'
     });
   };
 
@@ -203,7 +204,8 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
     if (!window.confirm(confirmMsg)) return;
 
     updateApplication({
-      resumeDataUsed: version.data
+      resumeDataUsed: version.data,
+      resumeVersionId: versionId
     });
   };
 
@@ -1200,14 +1202,23 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
               </label>
               
               <select
-                value=""
+                value={application.resumeVersionId || ''}
                 onChange={(e) => {
                   if (e.target.value === 'active') {
                     handleAssociateActiveCv();
-                  } else if (e.target.value) {
+                  } else if (e.target.value === '') {
+                    const confirmMsg = isFrench 
+                      ? "Dissocier le CV de cette candidature ?" 
+                      : "Dissociate the CV from this application?";
+                    if (window.confirm(confirmMsg)) {
+                      updateApplication({
+                        resumeDataUsed: undefined,
+                        resumeVersionId: ''
+                      });
+                    }
+                  } else {
                     handleAssociateCv(e.target.value);
                   }
-                  e.target.value = ""; // Reset
                 }}
                 className="w-full p-1.5 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded text-[11px] cursor-pointer"
               >
