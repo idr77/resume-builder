@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { initialResumeState, type ResumeData } from './types/resume';
 import ResumeForm from './components/Form/ResumeForm';
 import PDFTemplate from './components/Preview/PDFTemplate';
@@ -51,6 +51,8 @@ function App() {
   const [debouncedResumeData, setDebouncedResumeData] = useState<ResumeData>(initialResumeState);
   const [activeVersion, setActiveVersion] = useState<{ id: string; name: string; isLocked?: boolean } | null>(null);
   const [cvSaveStatus, setCvSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const lastSavedDataRef = useRef<string>('');
+  const lastActiveVersionIdRef = useRef<string>('');
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [showImportOpen, setShowImportOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -93,6 +95,8 @@ function App() {
             }
             setResumeData(matchedVersion.data);
             setDebouncedResumeData(matchedVersion.data);
+            lastSavedDataRef.current = JSON.stringify(matchedVersion.data);
+            lastActiveVersionIdRef.current = matchedVersion.id;
             setActiveVersion({ id: matchedVersion.id, name: matchedVersion.name, isLocked: matchedVersion.isLocked });
             return;
           }
@@ -117,6 +121,8 @@ function App() {
             }
             setResumeData(matchedVersion.data);
             setDebouncedResumeData(matchedVersion.data);
+            lastSavedDataRef.current = JSON.stringify(matchedVersion.data);
+            lastActiveVersionIdRef.current = matchedVersion.id;
             setActiveVersion({ id: matchedVersion.id, name: matchedVersion.name, isLocked: matchedVersion.isLocked });
             return;
           }
@@ -126,6 +132,8 @@ function App() {
       }
 
       // Default fallback
+      lastSavedDataRef.current = JSON.stringify(initialResumeState);
+      lastActiveVersionIdRef.current = 'initial';
       setActiveVersion({ id: 'initial', name: resumeData.language === 'fr' ? 'Version Initiale' : 'Initial Version', isLocked: false });
     };
     initializeData();
@@ -137,6 +145,17 @@ function App() {
     
     // Check if the data is actually different from initialResumeState before writing
     if (JSON.stringify(debouncedResumeData) === JSON.stringify(initialResumeState)) return;
+
+    // If activeVersion ID changed, it means we loaded a new version or branched.
+    // Update refs and skip auto-save to prevent double saves/branching.
+    if (activeVersion.id !== lastActiveVersionIdRef.current) {
+      lastActiveVersionIdRef.current = activeVersion.id;
+      lastSavedDataRef.current = JSON.stringify(debouncedResumeData);
+      return;
+    }
+
+    // If data hasn't changed since last save/load, do nothing
+    if (JSON.stringify(debouncedResumeData) === lastSavedDataRef.current) return;
 
     const saveActive = async () => {
       setCvSaveStatus('saving');
@@ -152,6 +171,8 @@ function App() {
           const online = await apiService.checkHealth();
           if (online && apiService.isLoggedIn()) {
             const saved = await apiService.saveVersion(nextName, debouncedResumeData);
+            lastActiveVersionIdRef.current = saved.id;
+            lastSavedDataRef.current = JSON.stringify(debouncedResumeData);
             setActiveVersion({ id: saved.id, name: saved.name, isLocked: false });
             setCvSaveStatus('saved');
           } else {
@@ -168,6 +189,8 @@ function App() {
             
             const updated = [newVersion, ...history];
             localStorage.setItem('ats_resumes_history', JSON.stringify(updated));
+            lastActiveVersionIdRef.current = nextId;
+            lastSavedDataRef.current = JSON.stringify(debouncedResumeData);
             setActiveVersion({ id: nextId, name: nextName, isLocked: false });
             setCvSaveStatus('saved');
             // Force a reload of versions list in VersionManager component
@@ -185,6 +208,7 @@ function App() {
         const online = await apiService.checkHealth();
         if (online && apiService.isLoggedIn()) {
           await apiService.saveVersion(activeVersion.name, debouncedResumeData);
+          lastSavedDataRef.current = JSON.stringify(debouncedResumeData);
           setCvSaveStatus('saved');
         } else {
           // Local storage overwrite
@@ -202,6 +226,7 @@ function App() {
               return v;
             });
             localStorage.setItem('ats_resumes_history', JSON.stringify(updated));
+            lastSavedDataRef.current = JSON.stringify(debouncedResumeData);
             setCvSaveStatus('saved');
           }
         }
