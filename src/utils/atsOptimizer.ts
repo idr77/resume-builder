@@ -171,7 +171,9 @@ export const analyzeResumeMatch = (resumeData: ResumeData, extraKeywords: string
     resumeData.personalInfo.jobTitle,
     resumeData.summary,
     ...resumeData.experience.map(e => `${e.role} ${e.company} ${e.description}`),
-    ...resumeData.education.map(e => `${e.degree} ${e.school} ${e.description}`)
+    ...resumeData.education.map(e => `${e.degree} ${e.school} ${e.description}`),
+    ...resumeData.skills.map(s => s.name),
+    ...resumeData.resumeLanguages.map(l => l.name)
   ];
   const combinedResumeText = resumeTextParts.join('\n').toLowerCase();
   
@@ -211,16 +213,15 @@ export const analyzeResumeMatch = (resumeData: ResumeData, extraKeywords: string
   const missingKeywords: string[] = [];
 
   targetKeywords.forEach(keyword => {
-    let isFound = false;
-    if (keyword.includes(' ')) {
-      isFound = combinedResumeText.includes(keyword.toLowerCase());
-    } else {
-      const escapedSkill = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(`\\b${escapedSkill}\\b`, 'i');
-      isFound = regex.test(combinedResumeText);
-    }
+    const trimmedKeyword = keyword.trim();
+    if (!trimmedKeyword) return;
 
-    if (isFound) {
+    const escapedSkill = trimmedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const startBoundary = /^\w/.test(trimmedKeyword) ? '\\b' : '';
+    const endBoundary = /\w$/.test(trimmedKeyword) ? '\\b' : '';
+    const regex = new RegExp(`${startBoundary}${escapedSkill}${endBoundary}`, 'i');
+    
+    if (regex.test(combinedResumeText)) {
       foundKeywords.push(keyword);
     } else {
       missingKeywords.push(keyword);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { ResumeData } from '../../types/resume';
-import { Save, FolderOpen, Copy, Trash2, Database, ChevronDown, ChevronUp, Cloud, Star, Lock, Unlock } from 'lucide-react';
+import { Save, FolderOpen, Copy, Trash2, Database, ChevronDown, ChevronUp, Cloud, Star, Lock, Unlock, Edit2 } from 'lucide-react';
 import { compressImage } from '../../utils/imageCompressor';
 import { apiService, type SavedVersion } from '../../utils/apiService';
 
@@ -347,6 +347,81 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
     }
   };
 
+  const handleRename = async (id: string, currentName: string) => {
+    if (id === 'initial') {
+      alert(language === 'fr' ? "Impossible de renommer la version initiale." : "Cannot rename the initial version.");
+      return;
+    }
+    const promptMsg = language === 'fr'
+      ? `Entrez le nouveau nom pour la version "${currentName}" :`
+      : `Enter the new name for version "${currentName}":`;
+    const newName = window.prompt(promptMsg, currentName);
+    if (newName === null) return; // Cancelled
+    
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === currentName) return;
+
+    // Check if duplicate name in local state
+    const isDuplicate = versions.some(v => v.name.toLowerCase() === trimmed.toLowerCase());
+    if (isDuplicate) {
+      alert(language === 'fr' ? "Une version avec ce nom existe déjà." : "A version with this name already exists.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      if (isCloud) {
+        const target = versions.find(v => v.id === id);
+        if (target) {
+          // 1. Save new version under the new name
+          const saved = await apiService.saveVersion(trimmed, target.data);
+          // 2. Delete the old version
+          await apiService.deleteVersion(id);
+          
+          // Refresh from cloud to get updated IDs and order
+          const cloudVersions = await apiService.fetchVersions();
+          setVersions(cloudVersions);
+          
+          // If the renamed version was the active one, update its name and active state
+          if (activeVersion?.id === id) {
+            const matched = cloudVersions.find(v => v.name === trimmed);
+            setActiveVersion({ 
+              id: matched ? matched.id : saved.id, 
+              name: trimmed, 
+              isLocked: matched ? matched.isLocked : saved.isLocked 
+            });
+          }
+          showNotification(language === 'fr' ? 'Version renommée sur le Cloud !' : 'Version renamed on Cloud!');
+        }
+      } else {
+        // Local Storage Rename
+        const stored = localStorage.getItem('ats_resumes_history');
+        if (stored) {
+          const parsed = JSON.parse(stored) as SavedVersion[];
+          const updated = parsed.map(v => v.id === id ? {
+            ...v,
+            name: trimmed,
+            updatedAt: new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+          } : v);
+          safeSetLocalStorage('ats_resumes_history', JSON.stringify(updated));
+          setVersions(updated);
+          
+          if (activeVersion?.id === id) {
+            setActiveVersion({ ...activeVersion, name: trimmed });
+          }
+          showNotification(language === 'fr' ? 'Version renommée localement !' : 'Version renamed locally!');
+        }
+      }
+      
+      // Dispatch storage change event to sync with other components
+      window.dispatchEvent(new Event('ats_resumes_history_changed'));
+    } catch (err) {
+      showNotification(language === 'fr' ? 'Échec du renommage' : 'Rename failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleDelete = async (id: string, name: string) => {
     if (id === 'initial') {
       alert(language === 'fr' ? "Impossible de supprimer la version initiale." : "Cannot delete the initial version.");
@@ -554,6 +629,16 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
                   >
                     {v.isLocked ? <Lock size={14} /> : <Unlock size={14} />}
                   </button>
+                  {v.id !== 'initial' && (
+                    <button 
+                      onClick={() => handleRename(v.id, v.name)}
+                      disabled={isLoading}
+                      className="p-1 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-400 hover:text-indigo-500 rounded transition-colors cursor-pointer disabled:opacity-50"
+                      title={isFrench ? 'Renommer' : 'Rename'}
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                  )}
                   <button 
                     onClick={() => handleLoad(v)}
                     disabled={isLoading}

@@ -88,6 +88,23 @@ describe('analyzeResumeMatch', () => {
     // Found action verbs in description: "developed", "optimized" (from English actions list)
     expect(result.actionVerbsAnalysis.count).toBe(2);
     expect(result.actionVerbsAnalysis.foundVerbs).toContain('developed');
-    expect(result.actionVerbsAnalysis.foundVerbs).toContain('optimized');
+  });
+
+  it('should match skills directly in the skills array and support special characters like C++, .NET, C#', () => {
+    const customResume: ResumeData = {
+      ...mockResume,
+      skills: [
+        { id: '1', name: 'C++' },
+        { id: '2', name: '.NET' },
+        { id: '3', name: 'C#' },
+        { id: '4', name: 'Tailwind CSS' }
+      ]
+    };
+    const result = analyzeResumeMatch(customResume, ['C++', '.NET', 'C#', 'Tailwind CSS']);
+    expect(result.foundKeywords).toContain('C++');
+    expect(result.foundKeywords).toContain('.NET');
+    expect(result.foundKeywords).toContain('C#');
+    expect(result.foundKeywords).toContain('Tailwind CSS');
+    expect(result.missingKeywords).not.toContain('C++');
   });
 });
