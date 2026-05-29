@@ -142,6 +142,65 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
 
   const isFrench = language === 'fr';
 
+  // Associated CV versions list
+  const [cvVersions, setCvVersions] = useState<{ id: string; name: string; updatedAt: string; data: ResumeData }[]>([]);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+
+  const loadCvVersions = async () => {
+    setIsLoadingVersions(true);
+    try {
+      const online = await apiService.checkHealth();
+      if (online && apiService.isLoggedIn()) {
+        const cloudVersions = await apiService.fetchVersions();
+        setCvVersions(cloudVersions.map(v => ({ id: v.id, name: v.name, updatedAt: v.updatedAt, data: v.data })));
+        setIsLoadingVersions(false);
+        return;
+      }
+    } catch (e) {
+      console.warn("Offline or unauthenticated, falling back to local resumes for association.");
+    }
+
+    try {
+      const stored = localStorage.getItem('ats_resumes_history');
+      if (stored) {
+        setCvVersions(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error("Failed to load resume history in ApplicationDetail", e);
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCvVersions();
+  }, []);
+
+  const handleAssociateActiveCv = () => {
+    const confirmMsg = isFrench 
+      ? "Associer le CV actuellement actif dans l'éditeur à cette candidature ?" 
+      : "Associate the current active builder CV with this application?";
+    if (!window.confirm(confirmMsg)) return;
+
+    updateApplication({
+      resumeDataUsed: activeResumeData
+    });
+  };
+
+  const handleAssociateCv = (versionId: string) => {
+    const version = cvVersions.find(v => v.id === versionId);
+    if (!version) return;
+
+    const confirmMsg = isFrench 
+      ? `Associer la version "${version.name}" à cette candidature ?`
+      : `Associate version "${version.name}" with this application?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    updateApplication({
+      resumeDataUsed: version.data
+    });
+  };
+
   // OneNote Export States & Methods
   const [oneNotePrefix, setOneNotePrefix] = useState<'Opportunité' | 'Candidature' | 'Entretien' | 'custom'>('Opportunité');
   const [oneNoteCustomPrefix, setOneNoteCustomPrefix] = useState('');
@@ -899,6 +958,67 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
         
         {/* Left column: Timeline/Steps list & Dossier */}
         <div className="col-span-1 space-y-4">
+          
+          {/* Associated CV Manager */}
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-3 rounded-lg shadow-sm transition-colors text-xs space-y-2">
+            <h3 className="font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+              <FileText size={14} className="text-indigo-500" />
+              {isFrench ? 'CV associé à la candidature' : 'Associated CV'}
+            </h3>
+            
+            {application.resumeDataUsed && Object.keys(application.resumeDataUsed).length > 0 ? (
+              <div className="p-2 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 rounded flex flex-col gap-1">
+                <div className="font-semibold text-indigo-900 dark:text-indigo-300">
+                  📄 {isFrench ? 'CV spécifique sauvegardé' : 'Saved Resume Snapshot'}
+                </div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                  {isFrench 
+                    ? `Nom : ${application.resumeDataUsed.personalInfo?.fullName || '-'} - ${application.resumeDataUsed.personalInfo?.jobTitle || '-'}`
+                    : `Name: ${application.resumeDataUsed.personalInfo?.fullName || '-'} - ${application.resumeDataUsed.personalInfo?.jobTitle || '-'}`
+                  }
+                </div>
+              </div>
+            ) : (
+              <div className="p-2 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 rounded flex flex-col gap-1">
+                <div className="font-semibold text-amber-900 dark:text-amber-300">
+                  ⚠️ {isFrench ? 'Aucun CV spécifique' : 'No specific CV'}
+                </div>
+                <div className="text-[10px] text-gray-500 dark:text-gray-400 leading-normal">
+                  {isFrench 
+                    ? "Utilise par défaut le CV actif de l'éditeur. Associez un CV ci-dessous pour figer le CV utilisé."
+                    : "Uses the active builder CV by default. Associate a specific version below to lock it."}
+                </div>
+              </div>
+            )}
+
+            {/* Selection Dropdown */}
+            <div className="space-y-1.5 pt-1">
+              <label className="block text-[10px] font-bold text-gray-400 uppercase">
+                {isFrench ? 'Associer un CV :' : 'Associate a CV:'}
+              </label>
+              
+              <select
+                value=""
+                onChange={(e) => {
+                  if (e.target.value === 'active') {
+                    handleAssociateActiveCv();
+                  } else if (e.target.value) {
+                    handleAssociateCv(e.target.value);
+                  }
+                  e.target.value = ""; // Reset
+                }}
+                className="w-full p-1.5 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded text-[11px] cursor-pointer"
+              >
+                <option value="">-- {isFrench ? 'Choisir un CV...' : 'Select a CV...'} --</option>
+                <option value="active">✨ {isFrench ? "CV Actuel de l'éditeur" : "Current Builder CV"}</option>
+                {cvVersions.map(v => (
+                  <option key={v.id} value={v.id}>
+                    💾 {v.name} ({v.updatedAt})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           
           {/* Recruitment timeline step creator */}
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-3 rounded-lg shadow-sm transition-colors text-xs">

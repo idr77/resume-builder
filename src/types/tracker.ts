@@ -24,4 +24,14 @@ export interface JobApplication {
   resumeDataUsed?: ResumeData; // The CV data snapshot at application time
   notes?: string; // General application notes / comments
   coverLetterText?: string; // Tailored motivation letter for this specific application
+  
+  // Salary/TJM estimation and simulation fields
+  companyType?: 'startup' | 'scaleup' | 'pme' | 'esn' | 'grand_groupe' | '';
+  location?: string;
+  contractType?: 'cdi' | 'freelance' | '';
+  salaryExpectation?: number;
+  salaryOffer?: number;
+  tjmExpectation?: number;
+  tjmOffer?: number;
+  salaryEstimateAiResult?: string;
 }

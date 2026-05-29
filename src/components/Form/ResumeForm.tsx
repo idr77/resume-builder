@@ -628,6 +628,28 @@ export default function ResumeForm({ data, onChange, missingKeywords = [], activ
                 </div>
               )}
 
+              {/* Missing Job Description Keywords */}
+              {!skillInput.trim() && missingKeywords && missingKeywords.length > 0 && (
+                <div className="mt-3">
+                  <span className="text-[10px] font-bold text-red-500 dark:text-red-400 uppercase tracking-wider block mb-1.5">
+                    {data.language === 'fr' ? 'Mots-clés manquants de l\'annonce :' : 'Missing Keywords from JD:'}
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {missingKeywords.map(keyword => (
+                      <button
+                        key={keyword}
+                        type="button"
+                        onClick={() => handleAddSkill(keyword)}
+                        className="text-[10px] bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:text-red-300 dark:border-red-900/60 dark:hover:bg-red-900/40 px-2 py-0.5 rounded border border-red-100 dark:border-red-950/40 transition cursor-pointer font-semibold"
+                        title={data.language === 'fr' ? `Ajouter "${keyword}"` : `Add "${keyword}"`}
+                      >
+                        + {keyword}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* AI action buttons */}
               <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-gray-800/80">
                 <button

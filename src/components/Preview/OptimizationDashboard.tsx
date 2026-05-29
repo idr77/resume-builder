@@ -165,6 +165,25 @@ Description de poste : ${data.targetJobDescription}`;
     }
   };
 
+  const handleAddMissingKeyword = (keyword: string) => {
+    const cleaned = keyword.trim();
+    if (!cleaned) return;
+    
+    // Check if duplicate
+    const isDuplicate = data.skills.some(s => s.name.toLowerCase() === cleaned.toLowerCase());
+    if (isDuplicate) return;
+
+    const newSkill = {
+      id: `sk-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: cleaned
+    };
+
+    onChange({
+      ...data,
+      skills: [...data.skills, newSkill]
+    });
+  };
+
   return (
     <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 transition-colors">
       
@@ -209,12 +228,20 @@ Description de poste : ${data.targetJobDescription}`;
                 <>
                   <div>
                     <span className="text-[9px] font-bold text-red-500 dark:text-red-400 uppercase tracking-wider mb-1 block">
-                      {isFrench ? 'Manquants' : 'Missing'} ({result.missingKeywords.length})
+                      {isFrench ? 'Manquants (Cliquer pour ajouter)' : 'Missing (Click to add)'} ({result.missingKeywords.length})
                     </span>
                     <div className="flex flex-wrap gap-1">
                       {result.missingKeywords.length === 0 && <span className="text-xs text-green-600 dark:text-green-400">None! 🎉</span>}
                       {result.missingKeywords.map(k => (
-                        <span key={k} className="px-2 py-0.5 text-[9px] font-medium bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-150 dark:border-red-800 rounded-full">{k}</span>
+                        <button
+                          key={k}
+                          onClick={() => handleAddMissingKeyword(k)}
+                          title={isFrench ? `Ajouter "${k}" aux compétences` : `Add "${k}" to skills`}
+                          className="px-2 py-0.5 text-[9px] font-medium bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-150 dark:border-red-800 rounded-full transition-all cursor-pointer flex items-center gap-1 group active:scale-95"
+                        >
+                          <span>{k}</span>
+                          <span className="text-[10px] text-red-400 group-hover:text-red-600 font-bold transition-colors">+</span>
+                        </button>
                       ))}
                     </div>
                   </div>

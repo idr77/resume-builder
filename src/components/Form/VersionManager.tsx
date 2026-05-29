@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { ResumeData } from '../../types/resume';
-import { Save, FolderOpen, Copy, Trash2, Database, ChevronDown, ChevronUp, Cloud, Star } from 'lucide-react';
+import { Save, FolderOpen, Copy, Trash2, Database, ChevronDown, ChevronUp, Cloud, Star, Lock, Unlock } from 'lucide-react';
 import { compressImage } from '../../utils/imageCompressor';
 import { apiService, type SavedVersion } from '../../utils/apiService';
 
@@ -8,8 +8,8 @@ interface Props {
   data: ResumeData;
   onLoad: (loadedData: ResumeData) => void;
   language: 'en' | 'fr';
-  activeVersion: { id: string; name: string } | null;
-  setActiveVersion: (ver: { id: string; name: string } | null) => void;
+  activeVersion: { id: string; name: string; isLocked?: boolean } | null;
+  setActiveVersion: (ver: { id: string; name: string; isLocked?: boolean } | null) => void;
 }
 
 export default function VersionManager({ data, onLoad, language, activeVersion, setActiveVersion }: Props) {
@@ -88,9 +88,20 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
     }
   };
 
-  // Load versions on mount
+  // Load versions on mount and listen for external changes
   useEffect(() => {
     loadVersions();
+
+    const handleHistoryChanged = () => {
+      loadVersions();
+    };
+    window.addEventListener('ats_resumes_history_changed', handleHistoryChanged);
+    window.addEventListener('storage', handleHistoryChanged);
+    
+    return () => {
+      window.removeEventListener('ats_resumes_history_changed', handleHistoryChanged);
+      window.removeEventListener('storage', handleHistoryChanged);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -103,7 +114,7 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
         setVersions(cloudVersions);
         setIsCloud(true);
         if (!activeVersion && cloudVersions.length > 0) {
-          setActiveVersion({ id: cloudVersions[0].id, name: cloudVersions[0].name });
+          setActiveVersion({ id: cloudVersions[0].id, name: cloudVersions[0].name, isLocked: cloudVersions[0].isLocked });
         }
         setIsLoading(false);
         return;
@@ -120,7 +131,7 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
         const parsed = JSON.parse(stored) as SavedVersion[];
         setVersions(parsed);
         if (!activeVersion && parsed.length > 0) {
-          setActiveVersion({ id: parsed[0].id, name: parsed[0].name });
+          setActiveVersion({ id: parsed[0].id, name: parsed[0].name, isLocked: parsed[0].isLocked });
         }
         // Run migration in background to compress any huge legacy base64 photos
         runBackgroundMigration(parsed);
@@ -130,12 +141,13 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
           id: 'initial',
           name: language === 'fr' ? 'Version Initiale' : 'Initial Version',
           updatedAt: new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
-          data: data
+          data: data,
+          isLocked: false
         };
         safeSetLocalStorage('ats_resumes_history', JSON.stringify([initial]));
         setVersions([initial]);
         if (!activeVersion) {
-          setActiveVersion({ id: 'initial', name: initial.name });
+          setActiveVersion({ id: 'initial', name: initial.name, isLocked: false });
         }
       }
     } catch (e) {
@@ -257,9 +269,9 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
         setVersions(cloudVersions);
         const matched = cloudVersions.find(v => v.name === newVersionName.trim());
         if (matched) {
-          setActiveVersion({ id: matched.id, name: matched.name });
+          setActiveVersion({ id: matched.id, name: matched.name, isLocked: matched.isLocked });
         } else {
-          setActiveVersion({ id: saved.id, name: saved.name });
+          setActiveVersion({ id: saved.id, name: saved.name, isLocked: saved.isLocked });
         }
         setNewVersionName('');
         showNotification(language === 'fr' ? 'Nouvelle version sauvegardée sur le Cloud !' : 'New version saved to Cloud!');
@@ -276,13 +288,14 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
       id: Date.now().toString(),
       name: newVersionName.trim(),
       updatedAt: new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
-      data: targetData
+      data: targetData,
+      isLocked: false
     };
 
     const updated = pruneHistoryList([newVersion, ...versions.filter(v => v.name !== newVersion.name)]);
     if (safeSetLocalStorage('ats_resumes_history', JSON.stringify(updated))) {
       setVersions(updated);
-      setActiveVersion({ id: newVersion.id, name: newVersion.name });
+      setActiveVersion({ id: newVersion.id, name: newVersion.name, isLocked: false });
       setNewVersionName('');
       showNotification(language === 'fr' ? 'Nouvelle version sauvegardée localement !' : 'New version saved locally!');
     }
@@ -290,7 +303,7 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
 
   const handleLoad = (version: SavedVersion) => {
     onLoad(version.data);
-    setActiveVersion({ id: version.id, name: version.name });
+    setActiveVersion({ id: version.id, name: version.name, isLocked: version.isLocked });
     showNotification(language === 'fr' ? `Version "${version.name}" chargée !` : `Loaded "${version.name}"!`);
   };
 
@@ -305,9 +318,9 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
         setVersions(cloudVersions);
         const matched = cloudVersions.find(v => v.name === duplicatedName);
         if (matched) {
-          setActiveVersion({ id: matched.id, name: matched.name });
+          setActiveVersion({ id: matched.id, name: matched.name, isLocked: matched.isLocked });
         } else {
-          setActiveVersion({ id: saved.id, name: saved.name });
+          setActiveVersion({ id: saved.id, name: saved.name, isLocked: saved.isLocked });
         }
         showNotification(language === 'fr' ? 'Version dupliquée sur le Cloud !' : 'Version duplicated on Cloud!');
       } catch (err) {
@@ -323,12 +336,13 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
       id: Date.now().toString(),
       name: duplicatedName,
       updatedAt: new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
-      data: version.data
+      data: version.data,
+      isLocked: false
     };
     const updated = pruneHistoryList([duplicated, ...versions]);
     if (safeSetLocalStorage('ats_resumes_history', JSON.stringify(updated))) {
       setVersions(updated);
-      setActiveVersion({ id: duplicated.id, name: duplicated.name });
+      setActiveVersion({ id: duplicated.id, name: duplicated.name, isLocked: false });
       showNotification(language === 'fr' ? 'Version dupliquée localement !' : 'Version duplicated locally!');
     }
   };
@@ -352,7 +366,7 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
         if (success) {
           setVersions(remainingVersions);
           if (activeVersion?.id === id && remainingVersions.length > 0) {
-            setActiveVersion({ id: remainingVersions[0].id, name: remainingVersions[0].name });
+            setActiveVersion({ id: remainingVersions[0].id, name: remainingVersions[0].name, isLocked: remainingVersions[0].isLocked });
             onLoad(remainingVersions[0].data);
           }
           showNotification(language === 'fr' ? 'Version supprimée du Cloud.' : 'Version deleted from Cloud.');
@@ -369,10 +383,46 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
     if (safeSetLocalStorage('ats_resumes_history', JSON.stringify(remainingVersions))) {
       setVersions(remainingVersions);
       if (activeVersion?.id === id && remainingVersions.length > 0) {
-        setActiveVersion({ id: remainingVersions[0].id, name: remainingVersions[0].name });
+        setActiveVersion({ id: remainingVersions[0].id, name: remainingVersions[0].name, isLocked: remainingVersions[0].isLocked });
         onLoad(remainingVersions[0].data);
       }
       showNotification(language === 'fr' ? 'Version locale supprimée.' : 'Local version deleted.');
+    }
+  };
+
+  const handleToggleLock = async (versionId: string) => {
+    setIsLoading(true);
+    const updatedVersions = versions.map(v => {
+      if (v.id === versionId) {
+        const nextLock = !v.isLocked;
+        // If currently active, sync the activeVersion state
+        if (activeVersion?.id === versionId) {
+          setActiveVersion({ ...activeVersion, isLocked: nextLock });
+        }
+        return { ...v, isLocked: nextLock };
+      }
+      return v;
+    });
+
+    try {
+      if (isCloud) {
+        // Sync to cloud
+        const target = updatedVersions.find(v => v.id === versionId);
+        if (target) {
+          await apiService.saveVersion(target.name, target.data);
+        }
+        const cloudVersions = await apiService.fetchVersions();
+        setVersions(cloudVersions);
+        showNotification(language === 'fr' ? 'Statut de verrouillage mis à jour !' : 'Lock status updated!');
+      } else {
+        safeSetLocalStorage('ats_resumes_history', JSON.stringify(updatedVersions));
+        setVersions(updatedVersions);
+        showNotification(language === 'fr' ? 'Statut de verrouillage mis à jour !' : 'Lock status updated!');
+      }
+    } catch (err) {
+      showNotification(language === 'fr' ? 'Échec de la mise à jour' : 'Update failed');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -416,13 +466,17 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
             <div className="flex items-center justify-between p-3 bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100/80 dark:border-indigo-900/60 rounded-lg shadow-sm">
               <div className="text-xs min-w-0 mr-2">
                 <span className="text-gray-500 dark:text-gray-400 font-medium">{isFrench ? "Version active : " : "Active version: "}</span>
-                <span className="font-bold text-indigo-700 dark:text-indigo-300 block sm:inline truncate">{activeVersion.name}</span>
+                <span className="font-bold text-indigo-700 dark:text-indigo-300 block sm:inline truncate">
+                  {activeVersion.isLocked && <Lock size={10} className="text-red-500 inline mr-1 shrink-0" />}
+                  {activeVersion.name}
+                </span>
               </div>
               <button
                 type="button"
                 onClick={handleManualUpdate}
-                disabled={isLoading}
+                disabled={isLoading || activeVersion.isLocked}
                 className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold shadow-sm transition-all shrink-0 cursor-pointer disabled:opacity-50"
+                title={activeVersion.isLocked ? (isFrench ? "Impossible d'écraser un CV verrouillé" : "Cannot overwrite a locked CV") : ""}
               >
                 <Save size={13} />
                 {isFrench ? "Enregistrer" : "Save changes"}
@@ -460,7 +514,10 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
                 className="flex items-center justify-between p-2.5 border border-gray-100 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
               >
                 <div className="flex-1 min-w-0 mr-3">
-                  <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 truncate">{v.name}</div>
+                  <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 truncate flex items-center gap-1">
+                    {v.isLocked && <Lock size={10} className="text-red-500 shrink-0" />}
+                    <span>{v.name}</span>
+                  </div>
                   <div className="text-[9px] text-gray-400 dark:text-gray-500 mt-0.5">{isFrench ? 'Modifié le : ' : 'Updated: '}{v.updatedAt}</div>
                 </div>
                 
@@ -482,6 +539,22 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
                     <Star size={14} fill={defaultVersionId === v.id ? 'currentColor' : 'none'} />
                   </button>
                   <button 
+                    onClick={() => handleToggleLock(v.id)}
+                    disabled={isLoading}
+                    className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-50 ${
+                      v.isLocked
+                        ? 'text-red-500 hover:text-red-650 hover:bg-red-50 dark:hover:bg-red-950/40' 
+                        : 'text-gray-400 hover:text-indigo-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                    title={
+                      v.isLocked
+                        ? (isFrench ? 'Version verrouillée (la modification créera une copie)' : 'Locked version (modifications will auto-branch)')
+                        : (isFrench ? 'Verrouiller cette version' : 'Lock this version')
+                    }
+                  >
+                    {v.isLocked ? <Lock size={14} /> : <Unlock size={14} />}
+                  </button>
+                  <button 
                     onClick={() => handleLoad(v)}
                     disabled={isLoading}
                     className="p-1 hover:bg-blue-50 dark:hover:bg-blue-955/40 text-blue-600 dark:text-blue-400 hover:text-blue-800 rounded transition-colors cursor-pointer disabled:opacity-50"
@@ -500,9 +573,9 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
                   {v.id !== 'initial' && (
                     <button 
                       onClick={() => handleDelete(v.id, v.name)}
-                      disabled={isLoading}
-                      className="p-1 hover:bg-red-50 dark:hover:bg-red-950/45 text-red-500 dark:text-red-400 hover:text-red-700 rounded transition-colors cursor-pointer disabled:opacity-50"
-                      title={isFrench ? 'Supprimer' : 'Delete'}
+                      disabled={isLoading || v.isLocked}
+                      className="p-1 hover:bg-red-50 dark:hover:bg-red-955/40 text-red-500 dark:text-red-400 hover:text-red-700 rounded transition-colors cursor-pointer disabled:opacity-50 disabled:hover:bg-transparent"
+                      title={v.isLocked ? (isFrench ? 'Déverrouillez pour supprimer' : 'Unlock to delete') : (isFrench ? 'Supprimer' : 'Delete')}
                     >
                       <Trash2 size={14} />
                     </button>

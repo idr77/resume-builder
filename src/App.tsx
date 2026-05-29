@@ -18,10 +18,38 @@ import ApplicationDetail from './components/Tracker/ApplicationDetail';
 import type { JobApplication } from './types/tracker';
 import { apiService } from './utils/apiService';
 
+// Heuristic to extract target company from Job Description
+export const extractTargetCompany = (jdText: string): string => {
+  if (!jdText) return '';
+  const lines = jdText.split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return '';
+
+  const prefixRegex = /^(company|entreprise|société|employeur|client)\s*:\s*(.+)$/i;
+  for (const line of lines.slice(0, 8)) {
+    const match = line.match(prefixRegex);
+    if (match && match[2]) {
+      return match[2].trim();
+    }
+  }
+
+  // Fallback: look for "at [Company]" or "chez [Company]"
+  const atRegex = /\b(at|chez)\s+([A-Z][a-zA-Z0-9_\s\-]{1,20})\b/;
+  const match = jdText.match(atRegex);
+  if (match && match[2]) {
+    const company = match[2].trim();
+    const commonWords = ['la', 'le', 'une', 'un', 'des', 'les', 'this', 'the', 'my', 'our', 'new'];
+    if (!commonWords.includes(company.toLowerCase())) {
+      return company;
+    }
+  }
+
+  return '';
+};
+
 function App() {
   const [resumeData, setResumeData] = useState<ResumeData>(initialResumeState);
   const [debouncedResumeData, setDebouncedResumeData] = useState<ResumeData>(initialResumeState);
-  const [activeVersion, setActiveVersion] = useState<{ id: string; name: string } | null>(null);
+  const [activeVersion, setActiveVersion] = useState<{ id: string; name: string; isLocked?: boolean } | null>(null);
   const [cvSaveStatus, setCvSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [showImportOpen, setShowImportOpen] = useState(false);
@@ -65,7 +93,7 @@ function App() {
             }
             setResumeData(matchedVersion.data);
             setDebouncedResumeData(matchedVersion.data);
-            setActiveVersion({ id: matchedVersion.id, name: matchedVersion.name });
+            setActiveVersion({ id: matchedVersion.id, name: matchedVersion.name, isLocked: matchedVersion.isLocked });
             return;
           }
         }
@@ -77,7 +105,7 @@ function App() {
       try {
         const localHistoryStr = localStorage.getItem('ats_resumes_history');
         if (localHistoryStr) {
-          const localHistory = JSON.parse(localHistoryStr) as { id: string; name: string; data: ResumeData }[];
+          const localHistory = JSON.parse(localHistoryStr) as any[];
           if (localHistory.length > 0) {
             let matchedVersion = localHistory[0];
             if (defaultVersionId) {
@@ -89,7 +117,7 @@ function App() {
             }
             setResumeData(matchedVersion.data);
             setDebouncedResumeData(matchedVersion.data);
-            setActiveVersion({ id: matchedVersion.id, name: matchedVersion.name });
+            setActiveVersion({ id: matchedVersion.id, name: matchedVersion.name, isLocked: matchedVersion.isLocked });
             return;
           }
         }
@@ -98,7 +126,7 @@ function App() {
       }
 
       // Default fallback
-      setActiveVersion({ id: 'initial', name: resumeData.language === 'fr' ? 'Version Initiale' : 'Initial Version' });
+      setActiveVersion({ id: 'initial', name: resumeData.language === 'fr' ? 'Version Initiale' : 'Initial Version', isLocked: false });
     };
     initializeData();
   }, []);
@@ -112,6 +140,47 @@ function App() {
 
     const saveActive = async () => {
       setCvSaveStatus('saving');
+
+      // If version is locked, save active as a new unlocked version instead of overwriting!
+      if (activeVersion.isLocked) {
+        const nextId = Date.now().toString();
+        const companyName = extractTargetCompany(resumeData.targetJobDescription || '');
+        const suffix = companyName || (resumeData.language === 'fr' ? 'Personnalisé' : 'Custom');
+        const nextName = `${activeVersion.name} (${suffix})`;
+        
+        try {
+          const online = await apiService.checkHealth();
+          if (online && apiService.isLoggedIn()) {
+            const saved = await apiService.saveVersion(nextName, debouncedResumeData);
+            setActiveVersion({ id: saved.id, name: saved.name, isLocked: false });
+            setCvSaveStatus('saved');
+          } else {
+            const stored = localStorage.getItem('ats_resumes_history');
+            const history = stored ? JSON.parse(stored) as any[] : [];
+            
+            const newVersion = {
+              id: nextId,
+              name: nextName,
+              updatedAt: new Date().toLocaleDateString(resumeData.language === 'fr' ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
+              data: debouncedResumeData,
+              isLocked: false
+            };
+            
+            const updated = [newVersion, ...history];
+            localStorage.setItem('ats_resumes_history', JSON.stringify(updated));
+            setActiveVersion({ id: nextId, name: nextName, isLocked: false });
+            setCvSaveStatus('saved');
+            // Force a reload of versions list in VersionManager component
+            window.dispatchEvent(new Event('ats_resumes_history_changed'));
+          }
+        } catch (err) {
+          console.error("Auto-branch save failed", err);
+          setCvSaveStatus('error');
+        }
+        setTimeout(() => setCvSaveStatus(prev => prev === 'saved' ? 'idle' : prev), 3000);
+        return;
+      }
+
       try {
         const online = await apiService.checkHealth();
         if (online && apiService.isLoggedIn()) {
