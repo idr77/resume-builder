@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ResumeData } from '../../types/resume';
+import { deduplicateSynonyms } from '../../utils/atsOptimizer';
 import type { OptimizationResult } from '../../utils/atsOptimizer';
 import { extractKeywordsWithGemini, generateAtsAdviceWithGemini } from '../../utils/geminiApiService';
 import { apiService } from '../../utils/apiService';
@@ -139,9 +140,17 @@ export default function OptimizationDashboard({ data, onChange, result, setAiKey
         2. **Compétences principales de haut niveau** : Listez uniquement les technologies et concepts majeurs. Bannissez absolument les sous-méthodes, sous-fonctionnalités ou détails granulaires.
            - OUI : "Java", "React", "Node.js", "CI/CD", "Docker", "SQL"
            - NON : "Java Streams", "Java Lambdas", "Java Multithreading", "React state", "React Hooks", "React Router", "Node.js cluster"
-        3. **Langue** : Rédigez les mots-clés dans la même langue que l'offre d'emploi.
-        4. **Format** : Retournez UNIQUEMENT un tableau de chaînes de caractères JSON valide brut, sans aucun formatage Markdown ni explications (ex : ["React", "TypeScript", "Node.js"]).
-
+        3. **Consolidation et dédoublonnage strict (CRITIQUE)** :
+           - Identifiez quand plusieurs mots-clés ou concepts représentent la même compétence et FUSIONNEZ-les. Ne retournez pas de doublons.
+           - Exemples de synonymes & concepts qui DOIVENT être fusionnés en un SEUL terme :
+             - Fusionnez "CI", "CD", "CI/CD", "Intégration continue", "Déploiement continu" -> Utilisez "CI/CD".
+             - Fusionnez "Qualité logicielle", "SonarQube", "Software quality" -> Utilisez "Qualité logicielle".
+             - Fusionnez "Agile", "Scrum", "Méthodologie agile" -> Utilisez "Agile".
+             - Fusionnez "Docker", "Containers" -> Utilisez "Docker".
+             - Fusionnez "Kubernetes", "K8s" -> Utilisez "Kubernetes".
+        4. **Langue** : Rédigez les mots-clés dans la même langue que l'offre d'emploi.
+        5. **Format** : Retournez UNIQUEMENT un tableau de chaînes de caractères JSON valide brut, sans aucun formatage Markdown ni explications (ex : ["React", "TypeScript", "Node.js"]).
+ 
         Description de poste : ${data.targetJobDescription}`;
         
         let response = await apiService.proxyLlm(systemPrompt, userPrompt, 'GEMINI');
@@ -163,7 +172,9 @@ export default function OptimizationDashboard({ data, onChange, result, setAiKey
         keywords = await extractKeywordsWithGemini(apiKey!, data.targetJobDescription || '', lang);
       }
 
-      setAiKeywords(keywords);
+      // De-duplicate using synonym mappings
+      const cleanedKeywords = deduplicateSynonyms(keywords);
+      setAiKeywords(cleanedKeywords);
     } catch (e) {
       console.error("Failed to extract keywords:", e);
       alert(lang === 'fr' ? "Échec de l'extraction des mots-clés." : "Extraction failed.");
@@ -233,18 +244,21 @@ export default function OptimizationDashboard({ data, onChange, result, setAiKey
         <div className="col-span-2 flex gap-4">
           <div className="flex flex-col items-center justify-center p-2 min-w-[90px] bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/40 dark:to-blue-950/30 rounded-lg border border-indigo-100/50 dark:border-indigo-900/50">
              <div className="text-3xl font-bold text-indigo-800 dark:text-indigo-300">
-                {result.matchScore}%
+                {result.targetKeywords.length === 0 ? '--%' : `${result.matchScore}%`}
              </div>
              <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider whitespace-nowrap mt-1">Match Score</div>
           </div>
           
-          <div className="flex-1 space-y-2 overflow-y-auto h-24 pr-2 scrollbar-thin">
+          <div className="flex-1 space-y-2 overflow-y-auto h-24 pr-2 scrollbar-thin flex items-center">
              {result.targetKeywords.length === 0 ? (
-                <p className="text-xs text-gray-400 dark:text-gray-500 italic mt-4">
-                  {isFrench ? 'Collez la description pour voir les mots-clés.' : 'Paste a JD to analyze keywords.'}
+                <p className="text-xs text-gray-400 dark:text-gray-500 italic">
+                  {!data.targetJobDescription?.trim()
+                    ? (isFrench ? 'Collez la description de poste dans l\'encadré de gauche pour commencer.' : 'Paste a job description in the left panel to begin.')
+                    : (isFrench ? 'Veuillez cliquer sur "Extraire les mots-clés" ci-dessous pour lancer l\'analyse de pertinence par l\'IA.' : 'Please click "Extract Keywords" below to run the AI relevance analysis.')
+                  }
                 </p>
              ) : (
-                <>
+                <div className="w-full space-y-2">
                   <div>
                     <span className="text-[9px] font-bold text-red-500 dark:text-red-400 uppercase tracking-wider mb-1 block">
                       {isFrench ? 'Manquants (Cliquer pour ajouter)' : 'Missing (Click to add)'} ({result.missingKeywords.length})
@@ -276,7 +290,7 @@ export default function OptimizationDashboard({ data, onChange, result, setAiKey
                       ))}
                     </div>
                   </div>
-                </>
+                </div>
              )}
           </div>
         </div>

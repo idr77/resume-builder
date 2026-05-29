@@ -64,7 +64,7 @@ describe('analyzeResumeMatch', () => {
   };
 
   it('should calculate matchScore correctly', () => {
-    const result = analyzeResumeMatch(mockResume);
+    const result = analyzeResumeMatch(mockResume, ['React', 'Node.js']);
     // Target keywords from JD: react, node.js
     // Found in resume: react (in experience, skills)
     // Missing: node.js
@@ -88,6 +88,23 @@ describe('analyzeResumeMatch', () => {
     // Found action verbs in description: "developed", "optimized" (from English actions list)
     expect(result.actionVerbsAnalysis.count).toBe(2);
     expect(result.actionVerbsAnalysis.foundVerbs).toContain('developed');
+  });
+
+  it('should support synonym-aware matching (e.g. CI/CD vs Intégration continue, Qualité logicielle vs SonarQube)', () => {
+    const customResume: ResumeData = {
+      ...mockResume,
+      skills: [
+        { id: '1', name: 'SonarQube' },
+        { id: '2', name: 'Intégration continue' }
+      ]
+    };
+    // Target keywords: 'Qualité logicielle' and 'CI/CD'
+    // Even though resume has 'SonarQube' and 'Intégration continue', they are synonyms of target keywords and should match!
+    const result = analyzeResumeMatch(customResume, ['Qualité logicielle', 'CI/CD']);
+    expect(result.foundKeywords).toContain('Qualité logicielle');
+    expect(result.foundKeywords).toContain('CI/CD');
+    expect(result.missingKeywords).not.toContain('CI/CD');
+    expect(result.matchScore).toBe(100);
   });
 
   it('should match skills directly in the skills array and support special characters like C++, .NET, C#', () => {

@@ -96,14 +96,56 @@ export const extractTargetJobTitle = (jdText: string): string => {
   return lines[0].slice(0, 40);
 };
 
+export const SYNONYM_GROUPS = [
+  ['ci', 'cd', 'ci/cd', 'intégration continue', 'déploiement continu', 'continuous integration', 'continuous deployment'],
+  ['qualité logicielle', 'quality assurance', 'software quality', 'sonarqube', 'sonar'],
+  ['javascript', 'js'],
+  ['typescript', 'ts'],
+  ['docker', 'containers', 'conteneurs'],
+  ['kubernetes', 'k8s'],
+  ['agile', 'scrum', 'agilité', 'méthodologie agile'],
+  ['react', 'reactjs', 'react.js'],
+  ['vue', 'vuejs', 'vue.js'],
+  ['angular', 'angularjs'],
+  ['node', 'nodejs', 'node.js'],
+  ['bdd', 'tdd', 'test driven development', 'behavior driven development', 'tests unitaires', 'unit tests'],
+  ['sql', 'relational database', 'base de données relationnelle']
+];
+
+export const deduplicateSynonyms = (keywords: string[]): string[] => {
+  const result: string[] = [];
+  const lowercaseResult = new Set<string>();
+
+  keywords.forEach(keyword => {
+    const trimmed = keyword.trim();
+    if (!trimmed) return;
+    const lower = trimmed.toLowerCase();
+
+    // Check if a synonym of this keyword is already in result
+    let hasSynonym = false;
+    for (const group of SYNONYM_GROUPS) {
+      const isInGroup = group.some(term => term.toLowerCase() === lower);
+      if (isInGroup) {
+        if (group.some(term => lowercaseResult.has(term.toLowerCase()))) {
+          hasSynonym = true;
+          break;
+        }
+      }
+    }
+
+    if (!hasSynonym && !lowercaseResult.has(lower)) {
+      result.push(trimmed);
+      lowercaseResult.add(lower);
+    }
+  });
+
+  return result;
+};
+
 export const analyzeResumeMatch = (resumeData: ResumeData, extraKeywords: string[] = []): OptimizationResult => {
   const jdText = resumeData.targetJobDescription || '';
-  const baseTargetKeywords = extractJDKeywords(jdText);
-  // If AI keywords have been extracted, use them exclusively as the target keywords list.
-  // Otherwise, fallback to the basic dictionary-extracted keywords.
-  const targetKeywords = extraKeywords.length > 0
-    ? extraKeywords
-    : baseTargetKeywords;
+  // Only use AI-provided (extra) keywords. Do not use imprecise dictionary keywords.
+  const targetKeywords = extraKeywords;
   const language = resumeData.language;
 
   // 1. Title Match Analysis
@@ -212,20 +254,43 @@ export const analyzeResumeMatch = (resumeData: ResumeData, extraKeywords: string
     recommendations: verbRecs
   };
 
-  // 4. Keywords score
+  // 4. Keywords score with Synonym Support
   const foundKeywords: string[] = [];
   const missingKeywords: string[] = [];
 
-  targetKeywords.forEach(keyword => {
-    const trimmedKeyword = keyword.trim();
-    if (!trimmedKeyword) return;
+  // Helper to check if a single keyword matches in resume
+  const isKeywordMatched = (kw: string): boolean => {
+    const trimmed = kw.trim();
+    if (!trimmed) return false;
+    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const startBoundary = /^\w/.test(trimmed) ? '\\b' : '';
+    const endBoundary = /\w$/.test(trimmed) ? '\\b' : '';
+    const regex = new RegExp(`${startBoundary}${escaped}${endBoundary}`, 'i');
+    return regex.test(combinedResumeText);
+  };
 
-    const escapedSkill = trimmedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const startBoundary = /^\w/.test(trimmedKeyword) ? '\\b' : '';
-    const endBoundary = /\w$/.test(trimmedKeyword) ? '\\b' : '';
-    const regex = new RegExp(`${startBoundary}${escapedSkill}${endBoundary}`, 'i');
-    
-    if (regex.test(combinedResumeText)) {
+  targetKeywords.forEach(keyword => {
+    // 1. Direct match check
+    if (isKeywordMatched(keyword)) {
+      foundKeywords.push(keyword);
+      return;
+    }
+
+    // 2. Synonym check
+    const lowerKw = keyword.trim().toLowerCase();
+    let synonymMatched = false;
+
+    for (const group of SYNONYM_GROUPS) {
+      if (group.some(term => term.toLowerCase() === lowerKw)) {
+        // Find if any other term in the synonym group is matched
+        if (group.some(term => isKeywordMatched(term))) {
+          synonymMatched = true;
+          break;
+        }
+      }
+    }
+
+    if (synonymMatched) {
       foundKeywords.push(keyword);
     } else {
       missingKeywords.push(keyword);

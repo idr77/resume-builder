@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: resume-builder-backend
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/ats_resumes}
+    username: ${SPRING_DATASOURCE_USERNAME:ats_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:ats_secure_password}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET:dGhpcy1pcy1hLXNlY3VyZS1hbmQtc3VwZXItc2VjcmV0LWtleS1mb3ItanctdG9rZW5zLW9mLXJlc3VtZS1idWlsZGVyLWxvY2FsLWRldg==}
+    expirationMs: 86400000 # 24 hours
+  security:
+    global-gemini-key: ${GEMINI_API_KEY:} # Populated from environment variables
+    encryption-key: ${AES_MASTER_KEY:MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=} # Default fallback for local testing
+
+server:
+  port: 8080

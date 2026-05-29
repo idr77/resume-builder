@@ -1,3 +1,5 @@
+import { deduplicateSynonyms } from './atsOptimizer';
+
 export const rewriteExperienceWithGemini = async (
   apiKey: string,
   originalText: string,
@@ -240,7 +242,14 @@ CONSTRAINTS & RULES (CRITICAL):
 2. **High-Level Core Skills Only**: List only the main technologies, frameworks, methodologies, or primary soft skills. Strictly avoid granular sub-features, libraries, or sub-topics.
    - YES: "Java", "React", "Node.js", "CI/CD", "Docker", "SQL", "Gestion de projet", "Scrum"
    - NO: "Java Streams", "Java Lambdas", "Java Multithreading", "React state", "React Hooks", "React Router", "Git branching", "API Restful"
-3. **Consolidation**: Group similar or reduntant tools into their primary parent categories. Remove duplicates or near-duplicate phrases.
+3. **Strict Consolidation & Deduplication**: Identify when multiple skills represent the same underlying competency or tools of the same category, and MERGE them. Do NOT output duplicates or near-duplicates.
+   - Examples of synonyms & concepts that MUST be merged into a SINGLE high-level term (do NOT output multiple of these):
+     - Merge "CI", "CD", "CI/CD", "Intégration continue", "Déploiement continu", "Continuous Integration" -> Use only "CI/CD" (or "CI/CD / Intégration continue").
+     - Merge "Qualité logicielle", "Quality assurance", "SonarQube", "Sonar", "Software quality" -> Use only "Qualité logicielle" (or "Software Quality").
+     - Merge "Agile", "Scrum", "Méthodologie agile" -> Use only "Méthodologie Agile" or "Scrum".
+     - Merge "Base de données", "SQL", "Database" -> Use only "Bases de données SQL".
+     - Merge "Docker", "Containers", "Conteneurs" -> Use only "Docker / Conteneurs".
+     - Merge "Kubernetes", "K8s" -> Use only "Kubernetes".
 4. **Formatting**: Format the output STRICTLY as a single comma-separated list of skills (e.g. React, TypeScript, Node.js). Do NOT add bullet points, numbering, subcategories, or introductory text.
 5. **Language**: The skills must be in ${langInstruction}.
 
@@ -255,7 +264,13 @@ ${expText}
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.7 } })
     });
     if (!response.ok) throw new Error('Failed to generate skills');
-    return (await response.json()).candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+    const rawText = (await response.json()).candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+    if (!rawText) return '';
+    
+    // Split by comma, deduplicate using our synonym group engine, and rejoin
+    const skillsArray = rawText.split(',').map((s: string) => s.trim()).filter(Boolean);
+    const dedupedArray = deduplicateSynonyms(skillsArray);
+    return dedupedArray.join(', ');
   } catch (error: any) {
     console.error("Gemini API Error in generateSkills:", error);
     throw error;
@@ -280,7 +295,13 @@ CONSTRAINTS & RULES (CRITICAL):
 2. **High-Level Core Skills Only**: List only the main technologies, frameworks, or core concepts. Do NOT list granular sub-features, libraries, or sub-methods.
    - YES: "Java", "React", "Node.js", "CI/CD", "Docker", "SQL"
    - NO: "Java Streams", "Java Lambdas", "Java Multithreading", "React state", "React Hooks", "React Router", "Node.js cluster"
-3. **Consolidation**: Group similar tools into their main parent framework or category unless a tool is specifically emphasized as a mandatory hard skill.
+3. **Strict Consolidation & Deduplication**: Identify when multiple keywords represent the same underlying competency or tools of the same category, and MERGE them. Do NOT output duplicates or near-duplicates.
+   - Examples of synonyms & concepts that MUST be merged into a SINGLE high-level term (do NOT output multiple of these):
+     - Merge "CI", "CD", "CI/CD", "Intégration continue", "Déploiement continu" -> Use "CI/CD".
+     - Merge "Qualité logicielle", "SonarQube", "Software quality" -> Use "Qualité logicielle".
+     - Merge "Agile", "Scrum", "Méthodologie agile" -> Use "Agile".
+     - Merge "Docker", "Containers" -> Use "Docker".
+     - Merge "Kubernetes", "K8s" -> Use "Kubernetes".
 4. **Formatting**: Return ONLY a raw valid JSON array of strings, e.g. ["React", "TypeScript", "Node.js", "Java", "Docker", "Agile"]. No markdown wrapping, no comments, no backticks.
 5. **Language**: Return the keywords in the exact language of the job description (${language === 'fr' ? 'French' : 'English'}).
 
@@ -301,13 +322,15 @@ ${jobDescription}
     // Robust parsing: Find the first '[' and last ']' to extract the JSON array safely
     const startIdx = text.indexOf('[');
     const endIdx = text.lastIndexOf(']');
+    let keywords: string[] = [];
     if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
       const cleanJson = text.slice(startIdx, endIdx + 1);
-      return JSON.parse(cleanJson);
+      keywords = JSON.parse(cleanJson);
+    } else {
+      const cleaned = text.replace(/^```json\n?|```$/g, '').trim();
+      keywords = JSON.parse(cleaned);
     }
-    
-    const cleaned = text.replace(/^```json\n?|```$/g, '').trim();
-    return JSON.parse(cleaned);
+    return deduplicateSynonyms(keywords);
   } catch (error: any) {
     console.error("Gemini API Error in extractKeywords:", error);
     return [];
