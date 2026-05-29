@@ -233,11 +233,16 @@ export const generateSkillsFromExperienceWithGemini = async (
 
   const prompt = `
 Role: You are an expert recruiter.
-Task: Extract a comprehensive list of technical and soft skills from the following professional experiences.
-Constraints:
-1. Format the output STRICTLY as a single comma-separated list of skills. Do not add any bullet points, categories, or introductory phrases.
-2. The skills must be in ${langInstruction}.
-3. Remove redundancies and use standard professional terminology.
+Task: Analyze the following professional experiences and extract a highly relevant, curated list of technical and soft skills.
+
+CONSTRAINTS & RULES (CRITICAL):
+1. **Target Size**: Extract between 10 and 20 core skills max. Never exceed 25 skills.
+2. **High-Level Core Skills Only**: List only the main technologies, frameworks, methodologies, or primary soft skills. Strictly avoid granular sub-features, libraries, or sub-topics.
+   - YES: "Java", "React", "Node.js", "CI/CD", "Docker", "SQL", "Gestion de projet", "Scrum"
+   - NO: "Java Streams", "Java Lambdas", "Java Multithreading", "React state", "React Hooks", "React Router", "Git branching", "API Restful"
+3. **Consolidation**: Group similar or reduntant tools into their primary parent categories. Remove duplicates or near-duplicate phrases.
+4. **Formatting**: Format the output STRICTLY as a single comma-separated list of skills (e.g. React, TypeScript, Node.js). Do NOT add bullet points, numbering, subcategories, or introductory text.
+5. **Language**: The skills must be in ${langInstruction}.
 
 Experiences:
 ${expText}
@@ -252,7 +257,7 @@ ${expText}
     if (!response.ok) throw new Error('Failed to generate skills');
     return (await response.json()).candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
+    console.error("Gemini API Error in generateSkills:", error);
     throw error;
   }
 };
