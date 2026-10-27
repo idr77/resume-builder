@@ -115,28 +115,68 @@ public class ApplicationController {
         application.setSalaryEstimateAiResult((String) payload.get("salaryEstimateAiResult"));
 
         List<Map<String, Object>> stepsList = (List<Map<String, Object>>) payload.get("interviewSteps");
-        List<InterviewStep> newSteps = new ArrayList<>();
-
         if (stepsList != null) {
+            List<InterviewStep> updatedSteps = new ArrayList<>();
             OffsetDateTime stepTime = OffsetDateTime.now();
             int idx = 0;
+
             for (Map<String, Object> stepMap : stepsList) {
-                InterviewStep step = new InterviewStep();
-                step.setApplication(application);
+                Object stepIdObj = stepMap.get("id");
+                UUID stepId = null;
+                if (stepIdObj != null) {
+                    try {
+                        stepId = UUID.fromString(stepIdObj.toString());
+                    } catch (IllegalArgumentException ignored) {}
+                }
+
+                // Look for existing step by UUID in application's current steps
+                InterviewStep step = null;
+                if (stepId != null && application.getInterviewSteps() != null) {
+                    for (InterviewStep s : application.getInterviewSteps()) {
+                        if (stepId.equals(s.getId())) {
+                            step = s;
+                            break;
+                        }
+                    }
+                }
+
                 String stepTitle = (String) stepMap.get("title");
                 String stepStatus = (String) stepMap.get("status");
-                step.setTitle(stepTitle != null ? stepTitle : "Entretien");
-                step.setStatus(stepStatus != null ? stepStatus : "pending");
-                step.setNotes((String) stepMap.get("notes"));
-                step.setAiPrep((String) stepMap.get("aiPrep"));
-                step.setDate((String) stepMap.get("date"));
-                step.setCreatedAt(stepTime.plusSeconds(idx++));
-                newSteps.add(step);
+
+                if (step != null) {
+                    // Update existing step in-place to preserve its persistent ID and relations
+                    step.setTitle(stepTitle != null ? stepTitle : "Entretien");
+                    step.setStatus(stepStatus != null ? stepStatus : "pending");
+                    step.setNotes((String) stepMap.get("notes"));
+                    step.setAiPrep((String) stepMap.get("aiPrep"));
+                    step.setDate((String) stepMap.get("date"));
+                    step.setUpdatedAt(OffsetDateTime.now());
+                    updatedSteps.add(step);
+                } else {
+                    // Create new step entity
+                    InterviewStep newStep = new InterviewStep();
+                    newStep.setApplication(application);
+                    newStep.setTitle(stepTitle != null ? stepTitle : "Entretien");
+                    newStep.setStatus(stepStatus != null ? stepStatus : "pending");
+                    newStep.setNotes((String) stepMap.get("notes"));
+                    newStep.setAiPrep((String) stepMap.get("aiPrep"));
+                    newStep.setDate((String) stepMap.get("date"));
+                    newStep.setCreatedAt(stepTime.plusSeconds(idx++));
+                    newStep.setUpdatedAt(OffsetDateTime.now());
+                    updatedSteps.add(newStep);
+                }
+            }
+
+            // Remove steps deleted by the user
+            application.getInterviewSteps().removeIf(s -> !updatedSteps.contains(s));
+
+            // Add newly created steps
+            for (InterviewStep s : updatedSteps) {
+                if (!application.getInterviewSteps().contains(s)) {
+                    application.getInterviewSteps().add(s);
+                }
             }
         }
-
-        application.getInterviewSteps().clear();
-        application.getInterviewSteps().addAll(newSteps);
     }
 
     // DELETE /api/applications/{id}

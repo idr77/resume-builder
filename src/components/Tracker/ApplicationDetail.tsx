@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { JobApplication, InterviewStep, ApplicationStatus } from '../../types/tracker';
 import type { ResumeData } from '../../types/resume';
 import { generateInterviewPrepWithGemini, generateCoverLetterWithGemini, generateAtsAdviceWithGemini } from '../../utils/geminiApiService';
@@ -116,6 +116,8 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
   const [activeStepId, setActiveStepId] = useState<string | null>(
     application.interviewSteps && application.interviewSteps.length > 0 ? application.interviewSteps[0].id : null
   );
+  const activeStepIdRef = useRef<string | null>(activeStepId);
+  const activeStepIndexRef = useRef<number>(0);
   const [newStepTitle, setNewStepTitle] = useState('');
   
   // AI Prep States
@@ -436,10 +438,12 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
     setCompTjmOffer(application.tjmOffer);
     setCompSalaryEstimateAiResult(application.salaryEstimateAiResult || '');
 
-    // Reset activeStepId to the first step of the new application
+    // Reset activeStepId to the first step when opening a different application
     const steps = application.interviewSteps || [];
     const firstStepId = steps.length > 0 ? steps[0].id : null;
     setActiveStepId(firstStepId);
+    activeStepIdRef.current = firstStepId;
+    activeStepIndexRef.current = 0;
 
     const step = steps.find(s => s.id === firstStepId);
     setNotesText(step ? step.notes || '' : '');
@@ -450,11 +454,65 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
     setCoverLetterMode('preview');
   }, [application.id]);
 
-  // Timeline Step Notes syncing effect
+  // Keep activeStepId and activeStepIndex synced and prevent accidental deselection
   useEffect(() => {
-    const step = (application.interviewSteps || []).find(s => s.id === activeStepId);
-    setNotesText(step ? step.notes || '' : '');
-  }, [activeStepId, application.interviewSteps]);
+    const steps = application.interviewSteps || [];
+    if (steps.length === 0) {
+      if (activeStepId !== null) {
+        setActiveStepId(null);
+        activeStepIdRef.current = null;
+        activeStepIndexRef.current = 0;
+        setNotesText('');
+      }
+      return;
+    }
+
+    const existingStep = steps.find(s => s.id === activeStepId);
+    if (existingStep) {
+      // Step found: update index ref
+      const idx = steps.findIndex(s => s.id === activeStepId);
+      if (idx !== -1) activeStepIndexRef.current = idx;
+    } else {
+      // Step ID was not found (e.g. backend converted temp ID to DB UUID or steps were reordered)
+      // Recover the active step by its index to preserve selection!
+      const fallbackIdx = Math.min(Math.max(0, activeStepIndexRef.current), steps.length - 1);
+      const recovered = steps[fallbackIdx];
+      if (recovered) {
+        setActiveStepId(recovered.id);
+        activeStepIdRef.current = recovered.id;
+        activeStepIndexRef.current = fallbackIdx;
+        setNotesText(recovered.notes || '');
+      }
+    }
+  }, [application.interviewSteps, activeStepId]);
+
+  const handleSelectStep = (stepId: string) => {
+    if (stepId === activeStepId) return;
+
+    // 1. If user had modified notes on the previously active step, persist them before switching
+    const currentStepId = activeStepIdRef.current;
+    if (currentStepId) {
+      const currentStep = (application.interviewSteps || []).find(s => s.id === currentStepId);
+      if (currentStep && notesText !== (currentStep.notes || '')) {
+        const updatedSteps = (application.interviewSteps || []).map(s =>
+          s.id === currentStepId ? { ...s, notes: notesText } : s
+        );
+        updateApplication({ interviewSteps: updatedSteps });
+      }
+    }
+
+    // 2. Select target step and initialize notesText in the same event
+    const steps = application.interviewSteps || [];
+    const targetIdx = steps.findIndex(s => s.id === stepId);
+    if (targetIdx !== -1) {
+      activeStepIndexRef.current = targetIdx;
+    }
+
+    activeStepIdRef.current = stepId;
+    setActiveStepId(stepId);
+    const targetStep = steps.find(s => s.id === stepId);
+    setNotesText(targetStep ? targetStep.notes || '' : '');
+  };
 
   const saveAllPendingChanges = async (
     nextNotes = notesText, 
@@ -474,8 +532,9 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
   ) => {
     setSaveStatus('saving');
     try {
+      const targetStepId = activeStepIdRef.current;
       const updatedSteps = (application.interviewSteps || []).map(s => {
-        if (s.id === activeStepId) {
+        if (s.id === targetStepId) {
           return { ...s, notes: nextNotes };
         }
         return s;
@@ -624,8 +683,9 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
     e.preventDefault();
     if (!newStepTitle.trim()) return;
 
+    const newStepId = Date.now().toString();
     const newStep: InterviewStep = {
-      id: Date.now().toString(),
+      id: newStepId,
       title: newStepTitle.trim(),
       status: 'pending',
       notes: '',
@@ -634,9 +694,13 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
 
     const currentSteps = application.interviewSteps || [];
     const updatedSteps = [...currentSteps, newStep];
+    const newIdx = updatedSteps.length - 1;
+    activeStepIndexRef.current = newIdx;
+    activeStepIdRef.current = newStepId;
+    setActiveStepId(newStepId);
+    setNotesText('');
     updateApplication({ interviewSteps: updatedSteps });
     setNewStepTitle('');
-    setActiveStepId(newStep.id);
   };
 
   const handleDeleteStep = (stepId: string) => {
@@ -648,7 +712,12 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
     updateApplication({ interviewSteps: updatedSteps });
     
     if (activeStepId === stepId) {
-      setActiveStepId(updatedSteps.length > 0 ? updatedSteps[0].id : null);
+      const nextActive = updatedSteps.length > 0 ? updatedSteps[0] : null;
+      const nextActiveId = nextActive ? nextActive.id : null;
+      activeStepIndexRef.current = 0;
+      activeStepIdRef.current = nextActiveId;
+      setActiveStepId(nextActiveId);
+      setNotesText(nextActive ? nextActive.notes || '' : '');
     }
   };
 
@@ -1282,7 +1351,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
                   return (
                     <div
                       key={step.id}
-                      onClick={() => setActiveStepId(step.id)}
+                      onClick={() => handleSelectStep(step.id)}
                       className={`p-2 border rounded-lg cursor-pointer transition flex items-center justify-between ${isActive ? 'bg-indigo-50/50 border-indigo-300 dark:bg-indigo-950/20 dark:border-indigo-900' : 'border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
