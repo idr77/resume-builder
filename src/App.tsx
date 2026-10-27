@@ -16,6 +16,7 @@ import { Settings, Languages, Loader2, Sun, Moon, Briefcase, FileText as FileIco
 import ApplicationTracker from './components/Tracker/ApplicationTracker';
 import ApplicationDetail from './components/Tracker/ApplicationDetail';
 import CloudLoginPage from './components/Auth/CloudLoginPage';
+import AIChatWidget from './components/Chat/AIChatWidget';
 import type { JobApplication } from './types/tracker';
 import { apiService } from './utils/apiService';
 
@@ -785,6 +786,13 @@ function App() {
 
       <ImportModal isOpen={showImportOpen} onClose={() => setShowImportOpen(false)} onImport={handleImport} language={resumeData.language} />
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} language={resumeData.language} />
+
+      {/* Floating AI Chat Assistant */}
+      <AIChatWidget
+        resumeData={resumeData}
+        selectedApplication={selectedApplication}
+        onOpenSettings={() => setShowSettings(true)}
+      />
     </div>
   );
 }
