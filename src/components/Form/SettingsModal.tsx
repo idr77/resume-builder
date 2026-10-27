@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getTranslation } from '../../i18n/translations';
 import type { Language } from '../../types/resume';
 import { apiService } from '../../utils/apiService';
-import { Cloud, CloudOff, RefreshCw, Loader2, LogOut, CheckCircle, Database } from 'lucide-react';
+import { Cloud, CloudOff, RefreshCw, Loader2, LogOut, CheckCircle, Database, Download, Upload } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
@@ -65,8 +65,16 @@ export default function SettingsModal({ isOpen, onClose, language }: Props) {
   if (!isOpen) return null;
   const t = getTranslation(language).modal;
 
-  const handleSave = () => {
-    localStorage.setItem('gemini_api_key', apiKey.trim());
+  const handleSave = async () => {
+    const trimmedKey = apiKey.trim();
+    localStorage.setItem('gemini_api_key', trimmedKey);
+    if (isServerOnline && isLoggedIn && trimmedKey) {
+      try {
+        await apiService.saveApiKey(trimmedKey);
+      } catch (e) {
+        console.warn('Could not sync API key to cloud:', e);
+      }
+    }
     onClose();
   };
 
@@ -107,13 +115,22 @@ export default function SettingsModal({ isOpen, onClose, language }: Props) {
       const localHistoryStr = localStorage.getItem('ats_resumes_history');
       if (localHistoryStr) {
         const localHistory = JSON.parse(localHistoryStr);
-        await apiService.syncVersions(localHistory);
+        if (Array.isArray(localHistory) && localHistory.length > 0) {
+          await apiService.syncVersions(localHistory);
+        }
       }
 
       const localTrackerStr = localStorage.getItem('ats_applications_tracker');
       if (localTrackerStr) {
         const localTracker = JSON.parse(localTrackerStr);
-        await apiService.syncApplications(localTracker);
+        if (Array.isArray(localTracker) && localTracker.length > 0) {
+          await apiService.syncApplications(localTracker);
+        }
+      }
+
+      const localKey = localStorage.getItem('gemini_api_key') || apiKey.trim();
+      if (localKey) {
+        await apiService.saveApiKey(localKey);
       }
 
       alert(language === 'fr'
@@ -121,6 +138,7 @@ export default function SettingsModal({ isOpen, onClose, language }: Props) {
         : "Data successfully synchronized with your PostgreSQL database!");
       
       calculateStorageSizes();
+      window.location.reload();
     } catch (e: any) {
       alert(language === 'fr'
         ? "Échec de la synchronisation : " + e.message
@@ -128,6 +146,83 @@ export default function SettingsModal({ isOpen, onClose, language }: Props) {
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  const handleExportFullBackup = () => {
+    const backup = {
+      ats_resumes_history: JSON.parse(localStorage.getItem('ats_resumes_history') || '[]'),
+      ats_applications_tracker: JSON.parse(localStorage.getItem('ats_applications_tracker') || '[]'),
+      ats_default_cv_version_id: localStorage.getItem('ats_default_cv_version_id') || null,
+      gemini_api_key: localStorage.getItem('gemini_api_key') || '',
+      app_theme: localStorage.getItem('app_theme') || 'light',
+      exportedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `resumebuilder_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportFullBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (!parsed || typeof parsed !== 'object') {
+          throw new Error('Format JSON invalide');
+        }
+        if (Array.isArray(parsed.ats_resumes_history)) {
+          localStorage.setItem('ats_resumes_history', JSON.stringify(parsed.ats_resumes_history));
+        }
+        if (Array.isArray(parsed.ats_applications_tracker)) {
+          localStorage.setItem('ats_applications_tracker', JSON.stringify(parsed.ats_applications_tracker));
+        }
+        if (parsed.ats_default_cv_version_id) {
+          localStorage.setItem('ats_default_cv_version_id', parsed.ats_default_cv_version_id);
+        }
+        if (parsed.gemini_api_key) {
+          localStorage.setItem('gemini_api_key', parsed.gemini_api_key);
+          setApiKey(parsed.gemini_api_key);
+        }
+        if (parsed.app_theme) {
+          localStorage.setItem('app_theme', parsed.app_theme);
+        }
+
+        if (isServerOnline && isLoggedIn) {
+          if (Array.isArray(parsed.ats_resumes_history) && parsed.ats_resumes_history.length > 0) {
+            await apiService.syncVersions(parsed.ats_resumes_history);
+          }
+          if (Array.isArray(parsed.ats_applications_tracker) && parsed.ats_applications_tracker.length > 0) {
+            await apiService.syncApplications(parsed.ats_applications_tracker);
+          }
+          if (parsed.gemini_api_key) {
+            await apiService.saveApiKey(parsed.gemini_api_key);
+          }
+        }
+
+        alert(language === 'fr'
+          ? (isServerOnline && isLoggedIn
+              ? "Sauvegarde importée et synchronisée avec le Cloud Postgres !"
+              : "Sauvegarde locale restaurée avec succès !")
+          : (isServerOnline && isLoggedIn
+              ? "Backup imported and synchronized with Cloud Postgres!"
+              : "Local backup restored successfully!"));
+        window.location.reload();
+      } catch (err: any) {
+        alert(language === 'fr'
+          ? "Erreur lors de l'import de la sauvegarde : " + (err.message || err)
+          : "Failed to import backup: " + (err.message || err));
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const handleClearAllData = () => {
@@ -344,6 +439,26 @@ export default function SettingsModal({ isOpen, onClose, language }: Props) {
                 ? "L'application sauvegarde localement vos CV si vous n'êtes pas connecté. Si le quota local est dépassé, les anciennes versions locales seront élaguées."
                 : "The application backs up CVs locally if not logged in. If local quota is exceeded, older local versions will be automatically pruned."}
             </p>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleExportFullBackup}
+                className="flex items-center justify-center gap-1.5 py-2 px-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/30 dark:hover:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 rounded text-xs font-semibold border border-indigo-200 dark:border-indigo-800/60 transition-colors cursor-pointer"
+                title={language === 'fr' ? 'Exporter tout le localStorage dans un fichier JSON' : 'Export all localStorage to a JSON file'}
+              >
+                <Download size={13} />
+                <span>{language === 'fr' ? 'Exporter Backup' : 'Export Backup'}</span>
+              </button>
+              <label
+                className="flex items-center justify-center gap-1.5 py-2 px-2.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 rounded text-xs font-semibold border border-emerald-200 dark:border-emerald-800/60 transition-colors cursor-pointer"
+                title={language === 'fr' ? 'Restaurer un fichier de backup JSON (et synchroniser au Cloud si connecté)' : 'Restore a JSON backup file (and sync to Cloud if connected)'}
+              >
+                <Upload size={13} />
+                <span>{language === 'fr' ? 'Importer Backup' : 'Import Backup'}</span>
+                <input type="file" accept=".json" onChange={handleImportFullBackup} className="hidden" />
+              </label>
+            </div>
 
             <button 
               onClick={handleClearAllData}

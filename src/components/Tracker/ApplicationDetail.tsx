@@ -963,7 +963,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
   const activeStep = currentSteps.find(s => s.id === activeStepId);
 
   return (
-    <div className="space-y-4 max-h-[calc(100vh-140px)] overflow-y-auto pr-1">
+    <div className="space-y-4 lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto pr-0.5 sm:pr-1">
       {/* Back Header */}
       <div className="flex justify-between items-center bg-white dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm transition-colors text-xs font-semibold flex-wrap gap-2">
         <button 
@@ -974,7 +974,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
           {isFrench ? 'Retour' : 'Back'}
         </button>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {saveStatus !== 'idle' && (
             <span className={`flex items-center gap-1 text-[10px] px-2.5 py-1 rounded-full font-bold border transition-all ${
               saveStatus === 'saving'
@@ -1443,12 +1443,12 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
         </div>
 
         {/* Middle and Right: Step Notes & AI Prep Guide */}
-        <div className="col-span-2 space-y-4">
+        <div className="col-span-1 md:col-span-2 space-y-4">
           {activeStep ? (
-            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4 rounded-lg shadow-sm transition-colors text-xs space-y-4">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-3 sm:p-4 rounded-lg shadow-sm transition-colors text-xs space-y-4">
               
               {/* Active Step Details */}
-              <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-3">
+              <div className="flex flex-wrap justify-between items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
                 <h3 className="text-sm font-bold text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
                   <Calendar size={15} />
                   {isFrench ? `Étape : ${activeStep.title}` : `Step: ${activeStep.title}`}
@@ -1508,7 +1508,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
 
               {/* AI Preparation block */}
               <div className="border-t border-gray-100 dark:border-gray-800 pt-4 space-y-3">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-wrap justify-between items-center gap-2">
                   <h4 className="font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
                     <Sparkles size={14} className="text-indigo-500" />
                     {isFrench ? '✨ Assistant IA de Préparation' : '✨ AI Interview Coach'}
@@ -1555,8 +1555,8 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
           )}
 
           {/* Compensation Simulator & AI Estimator */}
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4 rounded-lg shadow-sm transition-colors text-xs space-y-4">
-            <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-3">
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-3 sm:p-4 rounded-lg shadow-sm transition-colors text-xs space-y-4">
+            <div className="flex flex-wrap justify-between items-center gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
               <h3 className="text-sm font-bold text-indigo-700 dark:text-indigo-400 flex items-center gap-1.5">
                 <Share2 size={15} className="text-indigo-500" />
                 {isFrench ? '💰 Simulateur & Estimateur Salarial IA' : '💰 Salary & AI TJM Simulator'}

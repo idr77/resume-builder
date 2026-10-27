@@ -135,19 +135,19 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
            </div>
 
            {/* Original vs Proposed */}
-           <div className="grid grid-cols-2 gap-6">
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
              <div>
                <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">{isFrench ? 'Texte original' : 'Original Text'}</h4>
                <textarea 
                   value={originalText}
                   disabled
-                  className="w-full h-44 p-3 text-xs bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded text-gray-500 dark:text-gray-400 resize-none font-mono leading-relaxed"
+                  className="w-full h-36 sm:h-44 p-3 text-xs bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-800 rounded text-gray-500 dark:text-gray-400 resize-none font-mono leading-relaxed"
                />
              </div>
              <div>
                <h4 className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 mb-2">{proposedText ? (isFrench?'Proposition IA':'AI Proposal') : (isFrench?'Prêt à réécrire':'Ready to Rewrite')}</h4>
                {loading ? (
-                 <div className="w-full h-44 flex items-center justify-center border border-indigo-100 dark:border-indigo-950/20 rounded bg-indigo-50/20 dark:bg-indigo-950/10">
+                 <div className="w-full h-36 sm:h-44 flex items-center justify-center border border-indigo-100 dark:border-indigo-950/20 rounded bg-indigo-50/20 dark:bg-indigo-950/10">
                     <span className="text-xs font-medium text-indigo-500 dark:text-indigo-400 animate-pulse">
                       {isFrench ? 'Génération en cours...' : 'Generating...'}
                     </span>
@@ -156,7 +156,7 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
                  <textarea 
                     value={proposedText}
                     onChange={(e) => setProposedText(e.target.value)}
-                    className="w-full h-44 p-3 text-xs bg-white text-gray-900 border border-indigo-200 dark:border-indigo-900/50 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-mono leading-relaxed transition-colors"
+                    className="w-full h-36 sm:h-44 p-3 text-xs bg-white text-gray-900 border border-indigo-200 dark:border-indigo-900/50 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 font-mono leading-relaxed transition-colors"
                     placeholder={isFrench ? "Cliquez sur 'Générer la réécriture' ci-dessous pour lancer l'IA." : "Click 'Generate Rewrite' below to query the AI."}
                  />
                )}
@@ -171,7 +171,7 @@ export default function AIRewriteModal({ isOpen, onClose, originalText, missingK
            </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex justify-between gap-3 bg-gray-50 dark:bg-gray-950 rounded-b-xl">
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-200 dark:border-gray-800 flex flex-wrap justify-between gap-2 sm:gap-3 bg-gray-50 dark:bg-gray-950 rounded-b-xl">
           <button 
             onClick={handleRewrite} 
             disabled={loading}

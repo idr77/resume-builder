@@ -218,14 +218,14 @@ export default function OptimizationDashboard({ data, onChange, result, setAiKey
     <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 transition-colors">
       
       {/* Primary keywords & score view */}
-      <div className="p-4 grid grid-cols-3 gap-4">
+      <div className="p-3 sm:p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         {/* Left: Job Description Input */}
-        <div className="col-span-1 border-r border-gray-200 dark:border-gray-800 pr-4 flex flex-col gap-2">
+        <div className="col-span-1 border-b sm:border-b-0 sm:border-r border-gray-200 dark:border-gray-800 pb-3 sm:pb-0 sm:pr-4 flex flex-col gap-2">
           <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400">
             {isFrench ? 'Description de poste (Cible)' : 'Target Job Description'}
           </label>
           <textarea
-            className="w-full h-16 p-2 text-xs border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-indigo-500 resize-none font-sans transition-colors"
+            className="w-full h-16 p-2 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-indigo-500 resize-none font-sans transition-colors"
             placeholder={isFrench ? "Collez l'annonce ici..." : "Paste job offer here..."}
             value={data.targetJobDescription || ''}
             onChange={(e) => onChange({ ...data, targetJobDescription: e.target.value })}
@@ -233,7 +233,7 @@ export default function OptimizationDashboard({ data, onChange, result, setAiKey
           <button 
              disabled={isExtracting || !data.targetJobDescription}
              onClick={handleExtractKeywords}
-             className="text-[10px] w-full py-1 text-center bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 font-medium rounded transition disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer flex justify-center items-center gap-1"
+             className="text-[10px] w-full py-1.5 text-center bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 font-medium rounded transition disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:text-gray-400 dark:disabled:text-gray-600 cursor-pointer flex justify-center items-center gap-1"
           >
             <Sparkles size={10} />
             {isExtracting ? (isFrench ? 'Extraction...' : 'Extracting...') : (isFrench ? 'Extraire des mots-clés' : 'Extract Keywords')}
@@ -241,15 +241,15 @@ export default function OptimizationDashboard({ data, onChange, result, setAiKey
         </div>
         
         {/* Middle: Score & Breakdown */}
-        <div className="col-span-2 flex gap-4">
-          <div className="flex flex-col items-center justify-center p-2 min-w-[90px] bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/40 dark:to-blue-950/30 rounded-lg border border-indigo-100/50 dark:border-indigo-900/50">
-             <div className="text-3xl font-bold text-indigo-800 dark:text-indigo-300">
+        <div className="col-span-1 sm:col-span-2 flex gap-3 sm:gap-4 items-center">
+          <div className="flex flex-col items-center justify-center p-2 min-w-[78px] sm:min-w-[90px] bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/40 dark:to-blue-950/30 rounded-lg border border-indigo-100/50 dark:border-indigo-900/50 shrink-0">
+             <div className="text-2xl sm:text-3xl font-bold text-indigo-800 dark:text-indigo-300">
                 {result.targetKeywords.length === 0 ? '--%' : `${result.matchScore}%`}
              </div>
-             <div className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider whitespace-nowrap mt-1">Match Score</div>
+             <div className="text-[9px] sm:text-[10px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider whitespace-nowrap mt-1">Match Score</div>
           </div>
           
-          <div className="flex-1 space-y-2 overflow-y-auto h-24 pr-2 scrollbar-thin flex items-center">
+          <div className="flex-1 space-y-2 overflow-y-auto max-h-32 sm:h-24 pr-1 sm:pr-2 scrollbar-thin flex items-center">
              {result.targetKeywords.length === 0 ? (
                 <p className="text-xs text-gray-400 dark:text-gray-500 italic">
                   {!data.targetJobDescription?.trim()

@@ -38,6 +38,32 @@ public class AiGatewayService {
     }
 
     @Transactional
+    public void saveUserApiKey(UUID userId, String provider, String plainApiKey) {
+        if (plainApiKey == null || plainApiKey.trim().isEmpty()) {
+            return;
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable."));
+        String normProvider = (provider != null && !provider.isBlank()) ? provider.trim().toUpperCase() : "GEMINI";
+        try {
+            EncryptionService.EncryptionResult enc = encryptionService.encrypt(plainApiKey.trim());
+            UserApiKey entity = apiKeyRepository.findByUserIdAndProvider(userId, normProvider)
+                    .orElseGet(() -> {
+                        UserApiKey k = new UserApiKey();
+                        k.setUser(user);
+                        k.setProvider(normProvider);
+                        return k;
+                    });
+            entity.setEncryptedApiKey(enc.encryptedData());
+            entity.setEncryptionIv(enc.iv());
+            entity.setUpdatedAt(java.time.OffsetDateTime.now());
+            apiKeyRepository.save(entity);
+        } catch (Exception ex) {
+            throw new RuntimeException("Erreur lors du chiffrement de la clé API : " + ex.getMessage(), ex);
+        }
+    }
+
+    @Transactional
     public String requestAiService(UUID userId, String systemPrompt, String userPrompt, String preferredProvider) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable."));

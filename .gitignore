@@ -25,3 +25,8 @@ dist-ssr
 
 # Business and financial design documents (Local only)
 docs/business/
+
+# Backend build artifacts & environment files
+backend/target/
+.env
+*.env

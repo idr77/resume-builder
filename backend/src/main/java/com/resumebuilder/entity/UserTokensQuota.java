@@ -12,11 +12,6 @@ public class UserTokensQuota {
     @Column(name = "user_id")
     private UUID userId;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @MapsId
-    @JoinColumn(name = "user_id")
-    private User user;
-
     @Column(name = "token_balance", nullable = false)
     private Integer tokenBalance = 50000;
 
@@ -32,7 +27,6 @@ public class UserTokensQuota {
     public UserTokensQuota() {}
 
     public UserTokensQuota(User user, Integer tokenBalance, String subscriptionStatus) {
-        this.user = user;
         this.userId = user.getId();
         this.tokenBalance = tokenBalance;
         this.subscriptionStatus = subscriptionStatus;
@@ -45,17 +39,6 @@ public class UserTokensQuota {
 
     public void setUserId(UUID userId) {
         this.userId = userId;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    public void setUser(User user) {
-        this.user = user;
-        if (user != null) {
-            this.userId = user.getId();
-        }
     }
 
     public Integer getTokenBalance() {

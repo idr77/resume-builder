@@ -220,7 +220,7 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
 
     try {
       if (isCloud) {
-        await apiService.saveVersion(activeVersion.name, targetData);
+        await apiService.saveVersion(activeVersion.name, targetData, activeVersion.isLocked);
         // Refresh version list
         const cloudVersions = await apiService.fetchVersions();
         setVersions(cloudVersions);
@@ -374,7 +374,7 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
         const target = versions.find(v => v.id === id);
         if (target) {
           // 1. Save new version under the new name
-          const saved = await apiService.saveVersion(trimmed, target.data);
+          const saved = await apiService.saveVersion(trimmed, target.data, target.isLocked);
           // 2. Delete the old version
           await apiService.deleteVersion(id);
           
@@ -484,7 +484,7 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
         // Sync to cloud
         const target = updatedVersions.find(v => v.id === versionId);
         if (target) {
-          await apiService.saveVersion(target.name, target.data);
+          await apiService.saveVersion(target.name, target.data, target.isLocked);
         }
         const cloudVersions = await apiService.fetchVersions();
         setVersions(cloudVersions);
@@ -512,25 +512,25 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
     <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800">
       <button 
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-4 font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition cursor-pointer"
+        className="w-full flex items-center justify-between p-3.5 sm:p-4 font-semibold text-xs sm:text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition cursor-pointer gap-2"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           {isCloud ? (
-            <Cloud size={18} className="text-emerald-500 dark:text-emerald-400 animate-pulse" />
+            <Cloud size={18} className="text-emerald-500 dark:text-emerald-400 animate-pulse shrink-0" />
           ) : (
-            <Database size={18} className="text-indigo-500 dark:text-indigo-400" />
+            <Database size={18} className="text-indigo-500 dark:text-indigo-400 shrink-0" />
           )}
-          <span>
+          <span className="truncate">
             {isCloud 
-              ? (isFrench ? 'Gestionnaire de Versions (Synchronisé Cloud)' : 'Version Manager (Cloud Synced)')
-              : (isFrench ? 'Gestionnaire de Versions (Sauvegarde locale)' : 'Version Manager (Local Storage)')}
+              ? (isFrench ? 'Gestionnaire de Versions (Cloud)' : 'Version Manager (Cloud)')
+              : (isFrench ? 'Gestionnaire de Versions (Local)' : 'Version Manager (Local)')}
           </span>
         </div>
-        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        {isExpanded ? <ChevronUp size={18} className="shrink-0" /> : <ChevronDown size={18} className="shrink-0" />}
       </button>
 
       {isExpanded && (
-        <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-4">
+        <div className="p-3 sm:p-4 border-t border-gray-200 dark:border-gray-800 space-y-4">
           {message && (
             <div className="p-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/50 rounded text-xs text-center animate-fade-in font-medium">
               {message}
@@ -538,8 +538,8 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
           )}
 
           {activeVersion && (
-            <div className="flex items-center justify-between p-3 bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100/80 dark:border-indigo-900/60 rounded-lg shadow-sm">
-              <div className="text-xs min-w-0 mr-2">
+            <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 p-3 bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100/80 dark:border-indigo-900/60 rounded-lg shadow-sm">
+              <div className="text-xs min-w-0">
                 <span className="text-gray-500 dark:text-gray-400 font-medium">{isFrench ? "Version active : " : "Active version: "}</span>
                 <span className="font-bold text-indigo-700 dark:text-indigo-300 block sm:inline truncate">
                   {activeVersion.isLocked && <Lock size={10} className="text-red-500 inline mr-1 shrink-0" />}
@@ -566,7 +566,7 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
               value={newVersionName}
               onChange={(e) => setNewVersionName(e.target.value)}
               placeholder={isFrench ? "Ex: Développeur React - Google..." : "e.g. React Dev - Google..."}
-              className="flex-1 p-2 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+              className="flex-1 min-w-0 p-2 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
               maxLength={40}
               required
               disabled={isLoading}
@@ -574,7 +574,7 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
             <button 
               type="submit"
               disabled={isLoading}
-              className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50 shrink-0"
             >
               <Save size={14} />
               {isFrench ? 'Sauver' : 'Save'}
@@ -582,21 +582,21 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
           </form>
 
           {/* List of Saved Versions */}
-          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
             {versions.map(v => (
               <div 
                 key={v.id} 
-                className="flex items-center justify-between p-2.5 border border-gray-100 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 border border-gray-100 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
               >
-                <div className="flex-1 min-w-0 mr-3">
+                <div className="flex-1 min-w-0 sm:mr-3">
                   <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 truncate flex items-center gap-1">
                     {v.isLocked && <Lock size={10} className="text-red-500 shrink-0" />}
-                    <span>{v.name}</span>
+                    <span className="truncate">{v.name}</span>
                   </div>
                   <div className="text-[9px] text-gray-400 dark:text-gray-500 mt-0.5">{isFrench ? 'Modifié le : ' : 'Updated: '}{v.updatedAt}</div>
                 </div>
                 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center justify-end gap-1.5 shrink-0">
                   <button 
                     onClick={() => handleSetDefault(v.id)}
                     disabled={isLoading}

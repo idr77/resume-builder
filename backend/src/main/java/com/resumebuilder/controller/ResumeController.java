@@ -52,6 +52,7 @@ public class ResumeController {
             map.put("name", v.getVersionName());
             map.put("updatedAt", v.getCreatedAt().format(formatter));
             map.put("data", v.getResumeData());
+            map.put("isLocked", Boolean.TRUE.equals(v.getIsLocked()));
             result.add(map);
         }
 
@@ -87,10 +88,13 @@ public class ResumeController {
         }
 
         // Check if a version with the same name already exists to overwrite it, otherwise create new
-        Optional<ResumeVersion> existingOpt = versionRepository.findByResumeUser_IdAndVersionName(userId, versionName);
+        List<ResumeVersion> existingList = versionRepository.findAllByUserIdAndVersionName(userId, versionName);
         ResumeVersion version;
-        if (existingOpt.isPresent()) {
-            version = existingOpt.get();
+        if (!existingList.isEmpty()) {
+            version = existingList.get(0);
+            if (existingList.size() > 1) {
+                versionRepository.deleteAll(existingList.subList(1, existingList.size()));
+            }
         } else {
             version = new ResumeVersion();
             version.setResume(resume);
@@ -98,6 +102,11 @@ public class ResumeController {
         }
         
         version.setResumeData(resumeData);
+        if (payload.get("isLocked") instanceof Boolean isLocked) {
+            version.setIsLocked(isLocked);
+        } else if (version.getIsLocked() == null) {
+            version.setIsLocked(false);
+        }
         // Force update timestamp for overwritten versions
         version.setCreatedAt(OffsetDateTime.now());
         
@@ -109,6 +118,7 @@ public class ResumeController {
         response.put("name", saved.getVersionName());
         response.put("updatedAt", saved.getCreatedAt().format(formatter));
         response.put("data", saved.getResumeData());
+        response.put("isLocked", Boolean.TRUE.equals(saved.getIsLocked()));
 
         return ResponseEntity.ok(response);
     }
@@ -148,24 +158,52 @@ public class ResumeController {
         }
 
         final Resume activeResume = resume;
-        for (Map<String, Object> localVer : localVersions) {
+        OffsetDateTime baseTime = OffsetDateTime.now().minusSeconds(localVersions.size());
+        for (int i = localVersions.size() - 1; i >= 0; i--) {
+            Map<String, Object> localVer = localVersions.get(i);
             String name = (String) localVer.get("name");
             Map<String, Object> data = (Map<String, Object>) localVer.get("data");
             if (name == null || data == null) continue;
 
             // Overwrite if same name exists, otherwise create new
-            Optional<ResumeVersion> existingOpt = versionRepository.findByResumeUser_IdAndVersionName(userId, name);
-            ResumeVersion version = existingOpt.orElseGet(() -> {
-                ResumeVersion v = new ResumeVersion();
-                v.setResume(activeResume);
-                v.setVersionName(name);
-                return v;
-            });
+            List<ResumeVersion> existingList = versionRepository.findAllByUserIdAndVersionName(userId, name);
+            ResumeVersion version;
+            if (!existingList.isEmpty()) {
+                version = existingList.get(0);
+                if (existingList.size() > 1) {
+                    versionRepository.deleteAll(existingList.subList(1, existingList.size()));
+                }
+                // Protect against overwriting a real Cloud CV with the default "Jane Doe" placeholder template
+                if (isDefaultPlaceholderResume(data) && !isDefaultPlaceholderResume(version.getResumeData())) {
+                    continue;
+                }
+            } else {
+                version = new ResumeVersion();
+                version.setResume(activeResume);
+                version.setVersionName(name);
+            }
             version.setResumeData(data);
-            version.setCreatedAt(OffsetDateTime.now());
+            if (localVer.get("isLocked") instanceof Boolean isLocked) {
+                version.setIsLocked(isLocked);
+            } else if (version.getIsLocked() == null) {
+                version.setIsLocked(false);
+            }
+            version.setCreatedAt(baseTime.plusSeconds(localVersions.size() - i));
             versionRepository.save(version);
         }
 
         return ResponseEntity.ok(Map.of("success", true, "message", "Historique de CV synchronisé avec le cloud."));
+    }
+
+    @SuppressWarnings("unchecked")
+    private boolean isDefaultPlaceholderResume(Map<String, Object> resumeData) {
+        if (resumeData == null) return true;
+        Object personalInfoObj = resumeData.get("personalInfo");
+        if (personalInfoObj instanceof Map<?, ?> personalInfo) {
+            Object fullName = personalInfo.get("fullName");
+            Object email = personalInfo.get("email");
+            return "Jane Doe".equals(fullName) && "jane.doe@example.com".equals(email);
+        }
+        return false;
     }
 }

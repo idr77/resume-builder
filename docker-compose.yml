@@ -2,12 +2,13 @@ services:
   postgres:
     image: postgres:17-alpine
     container_name: ats_postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ats_user
       POSTGRES_PASSWORD: ats_secure_password
       POSTGRES_DB: ats_resumes
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
@@ -22,8 +23,9 @@ services:
     build:
       context: ./backend
     container_name: ats_backend
+    restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${BACKEND_PORT:-8080}:8080"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ats_resumes
       SPRING_DATASOURCE_USERNAME: ats_user
@@ -37,9 +39,23 @@ services:
     networks:
       - ats_network
 
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ats_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3081}:80"
+    depends_on:
+      - backend
+    networks:
+      - ats_network
+
 volumes:
   pgdata:
 
 networks:
   ats_network:
+    name: ats_network
     driver: bridge

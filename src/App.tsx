@@ -12,9 +12,10 @@ import OptimizationDashboard from './components/Preview/OptimizationDashboard';
 import { analyzeResumeMatch } from './utils/atsOptimizer';
 import { translateResumeWithGemini } from './utils/geminiApiService';
 import { compressImage } from './utils/imageCompressor';
-import { Settings, Languages, Loader2, Sun, Moon, Briefcase, FileText as FileIcon } from 'lucide-react';
+import { Settings, Languages, Loader2, Sun, Moon, Briefcase, FileText as FileIcon, Cloud, LogOut, Eye } from 'lucide-react';
 import ApplicationTracker from './components/Tracker/ApplicationTracker';
 import ApplicationDetail from './components/Tracker/ApplicationDetail';
+import CloudLoginPage from './components/Auth/CloudLoginPage';
 import type { JobApplication } from './types/tracker';
 import { apiService } from './utils/apiService';
 
@@ -60,7 +61,11 @@ function App() {
   const [aiKeywords, setAiKeywords] = useState<string[]>([]); // New state for AI keywords
   const [previewTab, setPreviewTab] = useState<'cv' | 'cl'>('cv');
   const [appMode, setAppMode] = useState<'cv' | 'tracker'>('cv');
+  const [mobilePanel, setMobilePanel] = useState<'editor' | 'preview'>('editor');
   const [selectedApplication, setSelectedApplication] = useState<JobApplication | null>(null);
+  const [cloudState, setCloudState] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => apiService.isLoggedIn());
+  const [offlineBypass, setOfflineBypass] = useState<boolean>(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('app_theme') as 'light' | 'dark') || 'light';
   });
@@ -74,35 +79,86 @@ function App() {
     localStorage.setItem('app_theme', theme);
   }, [theme]);
 
-  // Load the latest resume version on mount (either from Postgres cloud DB or local localStorage fallback)
+  useEffect(() => {
+    const handleAuthChanged = () => {
+      setIsLoggedIn(apiService.isLoggedIn());
+    };
+    window.addEventListener('ats_auth_changed', handleAuthChanged);
+    return () => window.removeEventListener('ats_auth_changed', handleAuthChanged);
+  }, []);
+
+  // Load the latest resume version on mount or auth change (either from Postgres cloud DB or local localStorage fallback)
   useEffect(() => {
     const initializeData = async () => {
       const defaultVersionId = localStorage.getItem('ats_default_cv_version_id');
 
-      // 1. Try to load from Spring Boot Backend Cloud if online and logged in
+      // 1. Check Spring Boot Backend Cloud status
       try {
         const online = await apiService.checkHealth();
-        if (online && apiService.isLoggedIn()) {
-          const cloudVersions = await apiService.fetchVersions();
-          if (cloudVersions.length > 0) {
-            let matchedVersion = cloudVersions[0];
-            if (defaultVersionId) {
-              const found = cloudVersions.find(v => v.id === defaultVersionId);
-              if (found) {
-                matchedVersion = found;
-                console.log("Loading default resume version from cloud DB on mount...");
+        if (online) {
+          setCloudState('online');
+          if (apiService.isLoggedIn()) {
+            let cloudVersions = await apiService.fetchVersions();
+
+            // If cloud account has no versions yet, check if localStorage has non-default CVs to migrate automatically
+            if (cloudVersions.length === 0) {
+              const localHistoryStr = localStorage.getItem('ats_resumes_history');
+              if (localHistoryStr) {
+                try {
+                  const localHistory = JSON.parse(localHistoryStr) as any[];
+                  const nonPlaceholder = localHistory.filter(
+                    v => v?.data?.personalInfo?.fullName && v.data.personalInfo.fullName !== 'Jane Doe'
+                  );
+                  if (nonPlaceholder.length > 0) {
+                    await apiService.syncVersions(nonPlaceholder);
+                    cloudVersions = await apiService.fetchVersions();
+                  }
+                } catch (e) {
+                  console.warn('Could not auto-migrate local history:', e);
+                }
               }
             }
-            setResumeData(matchedVersion.data);
-            setDebouncedResumeData(matchedVersion.data);
-            lastSavedDataRef.current = JSON.stringify(matchedVersion.data);
-            lastActiveVersionIdRef.current = matchedVersion.id;
-            setActiveVersion({ id: matchedVersion.id, name: matchedVersion.name, isLocked: matchedVersion.isLocked });
-            return;
+
+            if (cloudVersions.length > 0) {
+              let matchedVersion = cloudVersions[0];
+              if (defaultVersionId) {
+                const found = cloudVersions.find(v => v.id === defaultVersionId);
+                if (found) {
+                  matchedVersion = found;
+                }
+              }
+              setResumeData(matchedVersion.data);
+              setDebouncedResumeData(matchedVersion.data);
+              lastSavedDataRef.current = JSON.stringify(matchedVersion.data);
+              lastActiveVersionIdRef.current = matchedVersion.id;
+              setActiveVersion({ id: matchedVersion.id, name: matchedVersion.name, isLocked: matchedVersion.isLocked });
+              window.dispatchEvent(new Event('ats_resumes_history_changed'));
+              return;
+            } else {
+              // Initialize first version in Cloud
+              const initialName = resumeData.language === 'fr' ? 'Version Initiale' : 'Initial Version';
+              const saved = await apiService.saveVersion(initialName, initialResumeState, false);
+              setResumeData(saved.data);
+              setDebouncedResumeData(saved.data);
+              lastSavedDataRef.current = JSON.stringify(saved.data);
+              lastActiveVersionIdRef.current = saved.id;
+              setActiveVersion({ id: saved.id, name: saved.name, isLocked: saved.isLocked });
+              window.dispatchEvent(new Event('ats_resumes_history_changed'));
+              return;
+            }
+          } else {
+            // Cloud is online, user is not logged in -> CloudLoginPage will be displayed unless offlineBypass is true
+            setIsLoggedIn(false);
+            if (!offlineBypass) {
+              return;
+            }
           }
+        } else {
+          setCloudState('offline');
         }
       } catch (err) {
         console.warn("Failed to load cloud CV data on mount, attempting local storage check", err);
+        setIsLoggedIn(apiService.isLoggedIn());
       }
 
       // 2. Fallback: Load the default or latest version from local localStorage history if present
@@ -116,7 +172,6 @@ function App() {
               const found = localHistory.find(v => v.id === defaultVersionId);
               if (found) {
                 matchedVersion = found;
-                console.log("Loading default resume version from localStorage history on mount...");
               }
             }
             setResumeData(matchedVersion.data);
@@ -137,7 +192,8 @@ function App() {
       setActiveVersion({ id: 'initial', name: resumeData.language === 'fr' ? 'Version Initiale' : 'Initial Version', isLocked: false });
     };
     initializeData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, offlineBypass]);
 
   // Auto-save CV to active version
   useEffect(() => {
@@ -170,11 +226,12 @@ function App() {
         try {
           const online = await apiService.checkHealth();
           if (online && apiService.isLoggedIn()) {
-            const saved = await apiService.saveVersion(nextName, debouncedResumeData);
+            const saved = await apiService.saveVersion(nextName, debouncedResumeData, false);
             lastActiveVersionIdRef.current = saved.id;
             lastSavedDataRef.current = JSON.stringify(debouncedResumeData);
             setActiveVersion({ id: saved.id, name: saved.name, isLocked: false });
             setCvSaveStatus('saved');
+            window.dispatchEvent(new Event('ats_resumes_history_changed'));
           } else {
             const stored = localStorage.getItem('ats_resumes_history');
             const history = stored ? JSON.parse(stored) as any[] : [];
@@ -207,9 +264,14 @@ function App() {
       try {
         const online = await apiService.checkHealth();
         if (online && apiService.isLoggedIn()) {
-          await apiService.saveVersion(activeVersion.name, debouncedResumeData);
+          const saved = await apiService.saveVersion(activeVersion.name, debouncedResumeData, activeVersion.isLocked);
+          lastActiveVersionIdRef.current = saved.id;
           lastSavedDataRef.current = JSON.stringify(debouncedResumeData);
+          if (activeVersion.id !== saved.id) {
+            setActiveVersion({ id: saved.id, name: saved.name, isLocked: saved.isLocked });
+          }
           setCvSaveStatus('saved');
+          window.dispatchEvent(new Event('ats_resumes_history_changed'));
         } else {
           // Local storage overwrite
           const stored = localStorage.getItem('ats_resumes_history');
@@ -273,7 +335,7 @@ function App() {
           }
         }
 
-        setResumeData({
+        const nextData: ResumeData = {
           ...resumeData,
           ...parsed,
           personalInfo: {
@@ -281,7 +343,9 @@ function App() {
             photoUrl: photoUrl
           },
           language: resumeData.language
-        });
+        };
+        setResumeData(nextData);
+        setDebouncedResumeData(nextData);
         return;
       }
     } catch (e) {
@@ -388,50 +452,75 @@ function App() {
     e.target.value = ''; // Reset input to allow re-upload 
   };
 
+  if (cloudState === 'checking') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 text-gray-700 dark:text-gray-300 gap-3">
+        <Loader2 size={28} className="animate-spin text-indigo-600 dark:text-indigo-400" />
+        <p className="text-xs font-medium">
+          {resumeData.language === 'fr' ? 'Connexion au serveur Cloud...' : 'Connecting to Cloud server...'}
+        </p>
+      </div>
+    );
+  }
+
+  if (cloudState === 'online' && !isLoggedIn && !offlineBypass) {
+    return (
+      <CloudLoginPage
+        language={resumeData.language}
+        onLanguageChange={(lang) => setResumeData({ ...resumeData, language: lang })}
+        theme={theme}
+        onToggleTheme={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+        onLoginSuccess={() => setIsLoggedIn(true)}
+        onContinueOffline={() => setOfflineBypass(true)}
+      />
+    );
+  }
+
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-950 font-sans overflow-hidden transition-colors duration-200">
+    <div className="flex flex-col lg:flex-row h-[100dvh] bg-gray-50 dark:bg-gray-950 font-sans overflow-hidden transition-colors duration-200">
       {/* Sidebar / Form Area */}
-      <div className="w-1/2 flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 transition-colors">
-        <header className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-900 text-white shadow-md z-10">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold tracking-wide hidden lg:block">{t.title}</h1>
+      <div className={`w-full lg:w-1/2 flex flex-col lg:border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 transition-colors ${mobilePanel === 'preview' ? 'shrink-0 lg:flex-1' : 'flex-1 min-h-0'}`}>
+        <header className="px-3 sm:px-6 py-2.5 sm:py-3.5 border-b border-gray-200 dark:border-gray-800 flex flex-wrap justify-between items-center gap-2 bg-gray-900 text-white shadow-md z-10 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <h1 className="text-base sm:text-lg font-bold tracking-wide hidden xl:block">{t.title}</h1>
             <div className="flex bg-gray-800 p-0.5 rounded border border-gray-700">
               <button 
-                onClick={() => setAppMode('cv')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors cursor-pointer font-medium ${appMode === 'cv' ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:text-white'}`}
+                onClick={() => { setAppMode('cv'); setMobilePanel('editor'); }}
+                className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded text-xs transition-colors cursor-pointer font-medium ${appMode === 'cv' && mobilePanel === 'editor' ? 'bg-indigo-600 text-white' : appMode === 'cv' ? 'lg:bg-indigo-600 text-gray-300 lg:text-white hover:text-white' : 'text-gray-300 hover:text-white'}`}
                 title={resumeData.language === 'fr' ? 'Rédacteur de CV' : 'Resume Editor'}
               >
                 <FileIcon size={12} />
-                <span className="hidden sm:inline">{resumeData.language === 'fr' ? 'CV & Lettre' : 'CV & Letter'}</span>
+                <span>{resumeData.language === 'fr' ? 'CV & Lettre' : 'CV & Letter'}</span>
               </button>
               <button 
-                onClick={() => setAppMode('tracker')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors cursor-pointer font-medium ${appMode === 'tracker' ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:text-white'}`}
+                onClick={() => { setAppMode('tracker'); setMobilePanel('editor'); }}
+                className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded text-xs transition-colors cursor-pointer font-medium ${appMode === 'tracker' && mobilePanel === 'editor' ? 'bg-indigo-600 text-white' : appMode === 'tracker' ? 'lg:bg-indigo-600 text-gray-300 lg:text-white hover:text-white' : 'text-gray-300 hover:text-white'}`}
                 title={resumeData.language === 'fr' ? 'Suivi des candidatures' : 'Applications Tracker'}
               >
                 <Briefcase size={12} />
-                <span className="hidden sm:inline">{resumeData.language === 'fr' ? 'Candidatures' : 'Tracker'}</span>
+                <span>{resumeData.language === 'fr' ? 'Candidatures' : 'Tracker'}</span>
               </button>
             </div>
           </div>
-          <div className="flex gap-3 items-center text-sm font-medium">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2.5 items-center text-xs sm:text-sm font-medium">
             {isTranslating ? (
-              <span className="flex items-center text-yellow-400 bg-gray-800 px-3 py-1.5 rounded animate-pulse">
-                <Loader2 size={16} className="animate-spin mr-2" /> {t.translating}
+              <span className="flex items-center text-yellow-400 bg-gray-800 px-2.5 py-1 rounded text-xs animate-pulse">
+                <Loader2 size={14} className="animate-spin mr-1.5" /> {t.translating}
               </span>
             ) : (
-              <div className="flex items-center gap-1 bg-gray-800 p-0.5 rounded mr-2">
-                <span className="text-gray-400 px-2 flex items-center text-xs uppercase" title={t.translateResume}>
-                  <Languages size={14} className="mr-1" /> {t.translateResume}:
+              <div className="flex items-center gap-0.5 sm:gap-1 bg-gray-800 p-0.5 rounded" title={t.translateResume}>
+                <span className="text-gray-400 px-1.5 flex items-center text-xs uppercase">
+                  <Languages size={13} className="sm:mr-1" />
+                  <span className="hidden 2xl:inline">{t.translateResume}:</span>
                 </span>
                 <button 
-                  className="px-2 py-1 rounded text-xs transition-colors hover:bg-gray-700 text-gray-300"
+                  className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[11px] sm:text-xs transition-colors hover:bg-gray-700 text-gray-300 cursor-pointer"
                   onClick={() => handleTranslate('en')}
                 >
                   EN
                 </button>
                 <button 
-                  className="px-2 py-1 rounded text-xs transition-colors hover:bg-gray-700 text-gray-300"
+                  className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[11px] sm:text-xs transition-colors hover:bg-gray-700 text-gray-300 cursor-pointer"
                   onClick={() => handleTranslate('fr')}
                 >
                   FR
@@ -439,32 +528,48 @@ function App() {
               </div>
             )}
             
-            <div className="h-6 w-px bg-gray-700"></div>
+            <div className="h-5 w-px bg-gray-700 hidden sm:block"></div>
  
             <button 
               onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              className="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-300 hover:text-white"
+              className="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-300 hover:text-white cursor-pointer"
               title={resumeData.language === 'fr' ? 'Changer de thème' : 'Switch Theme'}
             >
-              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+              {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
             </button>
 
             <button 
               onClick={() => setShowSettings(true)}
-              className="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-300 hover:text-white"
+              className="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-300 hover:text-white cursor-pointer"
               title="Settings"
             >
-              <Settings size={18} />
+              <Settings size={16} />
             </button>
-            <div className="flex gap-1 bg-gray-800 p-0.5 rounded">
+
+            {cloudState === 'online' && isLoggedIn && (
+              <div className="flex items-center gap-1.5 bg-emerald-950/60 border border-emerald-800/70 text-emerald-300 px-2 py-1 rounded-full text-xs">
+                <Cloud size={13} className="text-emerald-400 shrink-0" />
+                <span className="hidden sm:inline max-w-[120px] truncate" title={apiService.getEmail()}>
+                  {apiService.getEmail()}
+                </span>
+                <button
+                  onClick={() => apiService.logout()}
+                  className="text-gray-400 hover:text-rose-400 transition-colors cursor-pointer"
+                  title={resumeData.language === 'fr' ? 'Se déconnecter' : 'Log out'}
+                >
+                  <LogOut size={13} />
+                </button>
+              </div>
+            )}
+            <div className="flex gap-0.5 bg-gray-800 p-0.5 rounded text-xs">
               <button 
-                className={`px-3 py-1 rounded transition-colors ${resumeData.language === 'en' ? 'bg-blue-600 shadow' : 'hover:bg-gray-700'}`}
+                className={`px-2 py-1 rounded transition-colors cursor-pointer ${resumeData.language === 'en' ? 'bg-blue-600 text-white shadow' : 'text-gray-300 hover:bg-gray-700'}`}
                 onClick={() => setResumeData({...resumeData, language: 'en'})}
               >
                 EN
               </button>
               <button 
-                className={`px-3 py-1 rounded transition-colors ${resumeData.language === 'fr' ? 'bg-blue-600 shadow' : 'hover:bg-gray-700'}`}
+                className={`px-2 py-1 rounded transition-colors cursor-pointer ${resumeData.language === 'fr' ? 'bg-blue-600 text-white shadow' : 'text-gray-300 hover:bg-gray-700'}`}
                 onClick={() => setResumeData({...resumeData, language: 'fr'})}
               >
                 FR
@@ -473,7 +578,7 @@ function App() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6 scroll-smooth bg-gray-50 dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 shadow-inner">
+        <main className={`${mobilePanel === 'preview' ? 'hidden lg:block' : 'block'} flex-1 overflow-y-auto p-3 sm:p-6 scroll-smooth bg-gray-50 dark:bg-gray-950 lg:border-r border-gray-200 dark:border-gray-800 shadow-inner`}>
           {appMode === 'tracker' ? (
             selectedApplication ? (
               <ApplicationDetail 
@@ -486,7 +591,8 @@ function App() {
                   try {
                     const online = await apiService.checkHealth();
                     if (online && apiService.isLoggedIn()) {
-                      await apiService.saveApplication(updated);
+                      const saved = await apiService.saveApplication(updated);
+                      setSelectedApplication(saved);
                       return;
                     }
                   } catch (err) {
@@ -521,21 +627,21 @@ function App() {
           ) : (
             <>
               <div className="mb-4 flex justify-between items-center flex-wrap gap-2">
-                <p className="text-gray-500 text-sm dark:text-gray-400">{t.subtitle}</p>
-                <div className="flex gap-2">
-                  <label className="text-xs bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 px-3 py-1.5 rounded-full font-medium border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition cursor-pointer">
-                    {resumeData.language === 'fr' ? 'Importer JSON (.json)' : 'Import JSON (.json)'}
+                <p className="text-gray-500 text-xs sm:text-sm dark:text-gray-400">{t.subtitle}</p>
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                  <label className="text-[11px] sm:text-xs bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full font-medium border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition cursor-pointer">
+                    {resumeData.language === 'fr' ? 'Importer JSON' : 'Import JSON'}
                     <input type="file" accept=".json" className="hidden" onChange={handleFileUpload} />
                   </label>
                   <button 
                     onClick={handleExport}
-                    className="text-xs bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300 px-3 py-1.5 rounded-full font-medium border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition cursor-pointer"
+                    className="text-[11px] sm:text-xs bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full font-medium border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition cursor-pointer"
                   >
                     {resumeData.language === 'fr' ? 'Exporter JSON' : 'Export JSON'}
                   </button>
                   <button 
                     onClick={() => setShowImportOpen(true)}
-                    className="text-xs bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 px-3 py-1.5 rounded-full font-medium border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition cursor-pointer"
+                    className="text-[11px] sm:text-xs bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full font-medium border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition cursor-pointer"
                   >
                     {t.quickImport}
                   </button>
@@ -554,23 +660,23 @@ function App() {
       </div>
 
       {/* Live Preview Area */}
-      <div className="w-1/2 flex flex-col bg-gray-100 dark:bg-gray-950 transition-colors">
+      <div className={`w-full lg:w-1/2 flex flex-col bg-gray-100 dark:bg-gray-950 transition-colors overflow-y-auto lg:overflow-hidden ${mobilePanel === 'preview' ? 'flex-1 min-h-0' : 'hidden lg:flex'}`}>
         <OptimizationDashboard data={resumeData} onChange={setResumeData} result={atsResult} setAiKeywords={setAiKeywords} />
 
-        <header className="px-6 py-3.5 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm flex items-center justify-between transition-colors">
-          <div className="flex items-center gap-3">
-            <div className="flex gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg transition-colors">
+        <header className="px-3 sm:px-6 py-2.5 sm:py-3.5 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm flex flex-wrap items-center justify-between gap-2 transition-colors shrink-0">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex gap-1 sm:gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg transition-colors">
               <button 
-                className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${previewTab === 'cv' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}
+                className={`px-2.5 sm:px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${previewTab === 'cv' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}
                 onClick={() => setPreviewTab('cv')}
               >
                 📄 {resumeData.language === 'fr' ? 'Mon CV' : 'My CV'}
               </button>
               <button 
-                className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${previewTab === 'cl' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}
+                className={`px-2.5 sm:px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${previewTab === 'cl' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}
                 onClick={() => setPreviewTab('cl')}
               >
-                ✉️ {resumeData.language === 'fr' ? 'Lettre de Motivation' : 'Cover Letter'}
+                ✉️ {resumeData.language === 'fr' ? 'Lettre' : 'Cover Letter'}
               </button>
             </div>
             {isGeneratingPreview && (
@@ -602,7 +708,7 @@ function App() {
               ? `${resumeData.personalInfo.fullName.replace(/\s+/g, '_')}_Resume.pdf`
               : `${resumeData.personalInfo.fullName.replace(/\s+/g, '_')}_Cover_Letter.pdf`
             }
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md shadow-sm text-xs font-semibold transition-colors"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-md shadow-sm text-xs font-semibold transition-colors shrink-0"
           >
             {({ loading }) => (loading ? t.generatingPdf : t.downloadPdf)}
           </PDFDownloadLink>
@@ -621,12 +727,61 @@ function App() {
           />
         )}
         
-        <main className="flex-1 overflow-hidden p-0 bg-gray-200 dark:bg-gray-900 flex flex-col transition-colors">
-          <PDFViewer width="100%" height="100%" className="border-none flex-1">
+        <main className="flex-1 min-h-[460px] lg:min-h-0 overflow-hidden p-0 bg-gray-200 dark:bg-gray-900 flex flex-col transition-colors">
+          <PDFViewer width="100%" height="100%" className="border-none flex-1 min-h-[460px] lg:min-h-0">
             {memoizedPdfDocument}
           </PDFViewer>
         </main>
       </div>
+
+      {/* Mobile / Small Screen Bottom Navigation Bar */}
+      <nav className="lg:hidden shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 grid grid-cols-3 z-20 shadow-lg">
+        <button
+          type="button"
+          onClick={() => { setAppMode('cv'); setMobilePanel('editor'); }}
+          className={`flex flex-col items-center justify-center py-2.5 gap-1 text-[11px] font-semibold transition-colors cursor-pointer ${
+            appMode === 'cv' && mobilePanel === 'editor'
+              ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 border-t-2 border-indigo-600 dark:border-indigo-400'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+          }`}
+        >
+          <FileIcon size={16} />
+          <span>{resumeData.language === 'fr' ? 'Éditeur CV' : 'CV Editor'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMobilePanel('preview')}
+          className={`flex flex-col items-center justify-center py-2.5 gap-1 text-[11px] font-semibold transition-colors cursor-pointer relative ${
+            mobilePanel === 'preview'
+              ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 border-t-2 border-indigo-600 dark:border-indigo-400'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+          }`}
+        >
+          <div className="flex items-center gap-1">
+            <Eye size={16} />
+            {atsResult.targetKeywords.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                {atsResult.matchScore}%
+              </span>
+            )}
+          </div>
+          <span>{resumeData.language === 'fr' ? 'Aperçu & ATS' : 'Preview & ATS'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setAppMode('tracker'); setMobilePanel('editor'); }}
+          className={`flex flex-col items-center justify-center py-2.5 gap-1 text-[11px] font-semibold transition-colors cursor-pointer ${
+            appMode === 'tracker' && mobilePanel === 'editor'
+              ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 border-t-2 border-indigo-600 dark:border-indigo-400'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+          }`}
+        >
+          <Briefcase size={16} />
+          <span>{resumeData.language === 'fr' ? 'Candidatures' : 'Tracker'}</span>
+        </button>
+      </nav>
 
       <ImportModal isOpen={showImportOpen} onClose={() => setShowImportOpen(false)} onImport={handleImport} language={resumeData.language} />
       <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} language={resumeData.language} />

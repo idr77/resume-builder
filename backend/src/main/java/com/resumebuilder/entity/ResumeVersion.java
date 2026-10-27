@@ -19,14 +19,17 @@ public class ResumeVersion {
     @JoinColumn(name = "resume_id", nullable = false)
     private Resume resume;
 
-    @Column(name = "version_name", nullable = false, length = 100)
+    @Column(name = "version_name", nullable = false, length = 255)
     private String versionName;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "resume_data", nullable = false)
     private Map<String, Object> resumeData;
 
-    @Column(name = "created_at", updatable = false)
+    @Column(name = "is_locked")
+    private Boolean isLocked = false;
+
+    @Column(name = "created_at")
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
     public ResumeVersion() {}
@@ -62,6 +65,14 @@ public class ResumeVersion {
 
     public void setResumeData(Map<String, Object> resumeData) {
         this.resumeData = resumeData;
+    }
+
+    public Boolean getIsLocked() {
+        return isLocked;
+    }
+
+    public void setIsLocked(Boolean isLocked) {
+        this.isLocked = isLocked;
     }
 
     public OffsetDateTime getCreatedAt() {

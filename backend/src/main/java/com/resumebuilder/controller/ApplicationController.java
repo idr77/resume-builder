@@ -68,41 +68,75 @@ public class ApplicationController {
             application.setUser(user);
         }
 
-        application.setCompanyName((String) payload.get("companyName"));
-        application.setRoleTitle((String) payload.get("roleTitle"));
+        populateApplicationFields(application, payload);
+        application.setUpdatedAt(OffsetDateTime.now());
+
+        JobApplication saved = applicationRepository.save(application);
+        return ResponseEntity.ok(saved);
+    }
+
+    private Double toDouble(Object val) {
+        if (val instanceof Number n) {
+            return n.doubleValue();
+        }
+        if (val instanceof String s && !s.isBlank()) {
+            try {
+                return Double.parseDouble(s);
+            } catch (NumberFormatException ignored) {}
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void populateApplicationFields(JobApplication application, Map<String, Object> payload) {
+        String companyName = (String) payload.get("companyName");
+        String roleTitle = (String) payload.get("roleTitle");
+        String appliedDate = (String) payload.get("appliedDate");
+        String status = (String) payload.get("status");
+
+        application.setCompanyName(companyName != null ? companyName : "");
+        application.setRoleTitle(roleTitle != null ? roleTitle : "");
         application.setJobDescription((String) payload.get("jobDescription"));
-        application.setAppliedDate((String) payload.get("appliedDate"));
-        application.setStatus((String) payload.get("status"));
+        application.setAppliedDate(appliedDate != null ? appliedDate : "");
+        application.setStatus(status != null ? status : "draft");
         application.setSkillsDossierFileName((String) payload.get("skillsDossierFileName"));
         application.setSkillsDossierText((String) payload.get("skillsDossierText"));
         application.setResumeDataUsed((Map<String, Object>) payload.get("resumeDataUsed"));
+        application.setResumeVersionId((String) payload.get("resumeVersionId"));
         application.setNotes((String) payload.get("notes"));
         application.setCoverLetterText((String) payload.get("coverLetterText"));
-        application.setUpdatedAt(OffsetDateTime.now());
+        application.setCompanyType((String) payload.get("companyType"));
+        application.setLocation((String) payload.get("location"));
+        application.setContractType((String) payload.get("contractType"));
+        application.setSalaryExpectation(toDouble(payload.get("salaryExpectation")));
+        application.setSalaryOffer(toDouble(payload.get("salaryOffer")));
+        application.setTjmExpectation(toDouble(payload.get("tjmExpectation")));
+        application.setTjmOffer(toDouble(payload.get("tjmOffer")));
+        application.setSalaryEstimateAiResult((String) payload.get("salaryEstimateAiResult"));
 
-        // Process nested interview steps
         List<Map<String, Object>> stepsList = (List<Map<String, Object>>) payload.get("interviewSteps");
         List<InterviewStep> newSteps = new ArrayList<>();
 
         if (stepsList != null) {
+            OffsetDateTime stepTime = OffsetDateTime.now();
+            int idx = 0;
             for (Map<String, Object> stepMap : stepsList) {
                 InterviewStep step = new InterviewStep();
                 step.setApplication(application);
-                step.setTitle((String) stepMap.get("title"));
-                step.setStatus((String) stepMap.get("status"));
+                String stepTitle = (String) stepMap.get("title");
+                String stepStatus = (String) stepMap.get("status");
+                step.setTitle(stepTitle != null ? stepTitle : "Entretien");
+                step.setStatus(stepStatus != null ? stepStatus : "pending");
                 step.setNotes((String) stepMap.get("notes"));
                 step.setAiPrep((String) stepMap.get("aiPrep"));
                 step.setDate((String) stepMap.get("date"));
+                step.setCreatedAt(stepTime.plusSeconds(idx++));
                 newSteps.add(step);
             }
         }
 
-        // JPA Cascade ALL and orphanRemoval handles clean overwrite when setting the collection reference!
         application.getInterviewSteps().clear();
         application.getInterviewSteps().addAll(newSteps);
-
-        JobApplication saved = applicationRepository.save(application);
-        return ResponseEntity.ok(saved);
     }
 
     // DELETE /api/applications/{id}
@@ -126,33 +160,39 @@ public class ApplicationController {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable."));
 
-        for (Map<String, Object> localApp : localApps) {
-            JobApplication app = new JobApplication();
-            app.setUser(user);
-            app.setCompanyName((String) localApp.get("companyName"));
-            app.setRoleTitle((String) localApp.get("roleTitle"));
-            app.setJobDescription((String) localApp.get("jobDescription"));
-            app.setAppliedDate((String) localApp.get("appliedDate"));
-            app.setStatus((String) localApp.get("status"));
-            app.setSkillsDossierFileName((String) localApp.get("skillsDossierFileName"));
-            app.setSkillsDossierText((String) localApp.get("skillsDossierText"));
-            app.setResumeDataUsed((Map<String, Object>) localApp.get("resumeDataUsed"));
-            app.setNotes((String) localApp.get("notes"));
-            app.setCoverLetterText((String) localApp.get("coverLetterText"));
+        List<JobApplication> existingApps = applicationRepository.findByUserId(userId);
+        OffsetDateTime baseTime = OffsetDateTime.now().minusSeconds(localApps.size());
 
-            List<Map<String, Object>> stepsList = (List<Map<String, Object>>) localApp.get("interviewSteps");
-            if (stepsList != null) {
-                for (Map<String, Object> stepMap : stepsList) {
-                    InterviewStep step = new InterviewStep();
-                    step.setApplication(app);
-                    step.setTitle((String) stepMap.get("title"));
-                    step.setStatus((String) stepMap.get("status"));
-                    step.setNotes((String) stepMap.get("notes"));
-                    step.setAiPrep((String) stepMap.get("aiPrep"));
-                    step.setDate((String) stepMap.get("date"));
-                    app.getInterviewSteps().add(step);
-                }
+        for (int i = localApps.size() - 1; i >= 0; i--) {
+            Map<String, Object> localApp = localApps.get(i);
+            String idStr = (String) localApp.get("id");
+            String companyName = (String) localApp.get("companyName");
+            String roleTitle = (String) localApp.get("roleTitle");
+            String appliedDate = (String) localApp.get("appliedDate");
+
+            JobApplication app = null;
+            if (idStr != null && !idStr.isBlank()) {
+                try {
+                    UUID appId = UUID.fromString(idStr);
+                    app = existingApps.stream().filter(a -> appId.equals(a.getId())).findFirst().orElse(null);
+                } catch (IllegalArgumentException ignored) {}
             }
+            if (app == null && companyName != null && roleTitle != null) {
+                app = existingApps.stream()
+                        .filter(a -> Objects.equals(a.getCompanyName(), companyName)
+                                && Objects.equals(a.getRoleTitle(), roleTitle)
+                                && Objects.equals(a.getAppliedDate(), appliedDate != null ? appliedDate : ""))
+                        .findFirst()
+                        .orElse(null);
+            }
+            if (app == null) {
+                app = new JobApplication();
+                app.setUser(user);
+            }
+
+            populateApplicationFields(app, localApp);
+            app.setCreatedAt(baseTime.plusSeconds(localApps.size() - i));
+            app.setUpdatedAt(OffsetDateTime.now());
             applicationRepository.save(app);
         }
 

@@ -22,18 +22,33 @@ public class LlmController {
         return UUID.fromString(userIdStr);
     }
 
+    @PostMapping("/apikey")
+    public ResponseEntity<?> saveApiKey(@RequestBody Map<String, String> payload) {
+        UUID userId = getAuthenticatedUserId();
+        String apiKey = payload.get("apiKey");
+        String provider = payload.getOrDefault("provider", "GEMINI");
+        if (apiKey != null && !apiKey.trim().isEmpty()) {
+            aiGatewayService.saveUserApiKey(userId, provider, apiKey.trim());
+        }
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
     @PostMapping("/proxy")
     public ResponseEntity<?> proxyAiRequest(@RequestBody Map<String, String> payload) {
         UUID userId = getAuthenticatedUserId();
         String systemPrompt = payload.get("systemPrompt");
         String userPrompt = payload.get("userPrompt");
         String provider = payload.getOrDefault("provider", "GEMINI");
+        String apiKey = payload.get("apiKey");
 
         if (userPrompt == null || userPrompt.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Le paramètre userPrompt est obligatoire."));
         }
 
         try {
+            if (apiKey != null && !apiKey.trim().isEmpty()) {
+                aiGatewayService.saveUserApiKey(userId, provider, apiKey.trim());
+            }
             String aiResponse = aiGatewayService.requestAiService(userId, systemPrompt, userPrompt, provider);
             return ResponseEntity.ok(Map.of("response", aiResponse));
         } catch (IllegalStateException ex) {

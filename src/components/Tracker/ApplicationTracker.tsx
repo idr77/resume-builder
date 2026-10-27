@@ -207,11 +207,11 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
   });
 
   return (
-    <div className="space-y-4 max-h-[calc(100vh-140px)] overflow-y-auto pr-1">
+    <div className="space-y-4 lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto pr-0.5 sm:pr-1">
       
       {/* Tracker Controls */}
-      <div className="flex justify-between items-center bg-white dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm transition-colors">
-        <div className="flex gap-2">
+      <div className="flex flex-wrap justify-between items-center gap-2 bg-white dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm transition-colors">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2">
           <button 
             onClick={handleExportData}
             disabled={isLoading}
@@ -228,7 +228,7 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
           </label>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {isLoading && <Loader2 size={14} className="animate-spin text-indigo-500" />}
           <div className="text-[10px] flex items-center gap-1 text-gray-400 font-semibold border border-gray-100 dark:border-gray-800 px-2.5 py-1 rounded-full">
             {isCloud ? (
@@ -258,7 +258,7 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
       {/* Quick Add Application Form */}
       {showAddForm && (
         <form onSubmit={handleCreateApplication} className="bg-white dark:bg-gray-900 border border-indigo-100 dark:border-indigo-950 p-4 rounded-lg shadow-md space-y-3 animate-fade-in transition-colors">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{isFrench ? 'ENTREPRISE' : 'COMPANY'}</label>
               <input 
@@ -310,7 +310,7 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
       )}
 
       {/* Filter and Search Panel */}
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         {/* Search */}
         <div className="relative flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -319,7 +319,7 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={isFrench ? "Rechercher une entreprise, un poste..." : "Search company, job..."}
-            className="w-full pl-9 pr-3 py-2 text-xs border border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 rounded-lg focus:border-indigo-500 transition shadow-sm"
+            className="w-full pl-9 pr-3 py-2 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 rounded-lg focus:border-indigo-500 transition shadow-sm"
           />
         </div>
 
@@ -327,7 +327,7 @@ export default function ApplicationTracker({ activeResumeData, onSelectApplicati
         <select 
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="p-2 text-xs border border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 rounded-lg focus:border-indigo-500 shadow-sm animate-fade-in"
+          className="p-2 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 rounded-lg focus:border-indigo-500 shadow-sm animate-fade-in"
         >
           <option value="all">{isFrench ? 'Tous les statuts' : 'All Status'}</option>
           <option value="draft">{isFrench ? 'Brouillon' : 'Draft'}</option>

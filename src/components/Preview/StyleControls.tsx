@@ -26,18 +26,18 @@ export default function StyleControls({ settings, onChange, language }: Props) {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-2.5 flex flex-wrap items-center justify-between gap-4 shadow-sm z-10 transition-colors">
+    <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-3 sm:px-6 py-2 sm:py-2.5 grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-between gap-2.5 sm:gap-4 shadow-sm z-10 transition-colors shrink-0">
       
       {/* Template Select */}
-      <div className="flex items-center gap-2">
-        <Layout size={14} className="text-gray-500 dark:text-gray-400" />
-        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+        <Layout size={14} className="text-gray-500 dark:text-gray-400 shrink-0" />
+        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 hidden xs:inline">
           {isFrench ? 'Modèle :' : 'Template:'}
         </span>
         <select 
           value={settings.template} 
           onChange={(e) => updateSetting('template', e.target.value as any)}
-          className="p-1 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:ring-1 focus:ring-indigo-500"
+          className="flex-1 sm:flex-initial min-w-0 p-1 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:ring-1 focus:ring-indigo-500"
         >
           <option value="classic">{isFrench ? 'Classic (Actuel)' : 'Classic (Current)'}</option>
           <option value="modern">{isFrench ? 'Modern' : 'Modern'}</option>
@@ -46,9 +46,9 @@ export default function StyleControls({ settings, onChange, language }: Props) {
       </div>
 
       {/* Accent Colors */}
-      <div className="flex items-center gap-2">
-        <Palette size={14} className="text-gray-500 dark:text-gray-400" />
-        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        <Palette size={14} className="text-gray-500 dark:text-gray-400 shrink-0" />
+        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 hidden sm:inline">
           {isFrench ? 'Couleur :' : 'Color:'}
         </span>
         <div className="flex items-center gap-1.5">
@@ -59,7 +59,7 @@ export default function StyleControls({ settings, onChange, language }: Props) {
                 key={col}
                 type="button"
                 onClick={() => updateSetting('themeColor', col)}
-                className={`w-5 h-5 rounded-full ${colorMap[col].bg} transition-all cursor-pointer ${isActive ? 'ring-2 ring-indigo-500 ring-offset-2 scale-110' : 'hover:scale-105'}`}
+                className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full ${colorMap[col].bg} transition-all cursor-pointer ${isActive ? 'ring-2 ring-indigo-500 ring-offset-2 scale-110' : 'hover:scale-105'}`}
                 title={colorMap[col].name}
               />
             );
@@ -68,15 +68,15 @@ export default function StyleControls({ settings, onChange, language }: Props) {
       </div>
 
       {/* Font Family */}
-      <div className="flex items-center gap-2">
-        <Type size={14} className="text-gray-500 dark:text-gray-400" />
-        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+        <Type size={14} className="text-gray-500 dark:text-gray-400 shrink-0" />
+        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 hidden sm:inline">
           {isFrench ? 'Police :' : 'Font:'}
         </span>
         <select 
           value={settings.fontFamily} 
           onChange={(e) => updateSetting('fontFamily', e.target.value as any)}
-          className="p-1 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:ring-1 focus:ring-indigo-500"
+          className="flex-1 sm:flex-initial min-w-0 p-1 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:ring-1 focus:ring-indigo-500"
         >
           <option value="Helvetica">Sans-Serif (Helvetica)</option>
           <option value="Times-Roman">Serif (Times-Roman)</option>
@@ -85,15 +85,15 @@ export default function StyleControls({ settings, onChange, language }: Props) {
       </div>
 
       {/* Font Size */}
-      <div className="flex items-center gap-2">
-        <Type size={14} className="text-gray-500 dark:text-gray-400" />
-        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+        <Type size={14} className="text-gray-500 dark:text-gray-400 shrink-0" />
+        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 hidden sm:inline">
           {isFrench ? 'Taille :' : 'Size:'}
         </span>
         <select 
           value={settings.fontSize} 
           onChange={(e) => updateSetting('fontSize', e.target.value as any)}
-          className="p-1 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:ring-1 focus:ring-indigo-500"
+          className="flex-1 sm:flex-initial min-w-0 p-1 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:ring-1 focus:ring-indigo-500"
         >
           <option value="small">{isFrench ? 'Petit' : 'Small'}</option>
           <option value="medium">{isFrench ? 'Moyen' : 'Medium'}</option>

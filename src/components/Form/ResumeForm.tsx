@@ -674,10 +674,10 @@ export default function ResumeForm({ data, onChange, missingKeywords = [], activ
               {data.resumeLanguages.map((lang) => (
                 <div key={lang.id} className="grid grid-cols-4 gap-2 mb-2 relative pr-8">
                   <div className="col-span-2">
-                    <input type="text" value={lang.name} placeholder="English, Français..." onChange={(e) => updateArrayItem('resumeLanguages', lang.id, { name: e.target.value })} className="w-full p-2 text-sm border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" />
+                    <input type="text" value={lang.name} placeholder="English, Français..." onChange={(e) => updateArrayItem('resumeLanguages', lang.id, { name: e.target.value })} className="w-full p-2 text-sm bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors" />
                   </div>
                   <div className="col-span-2 relative flex items-center pr-2">
-                    <select value={lang.level} onChange={(e) => updateArrayItem('resumeLanguages', lang.id, { level: Number(e.target.value) })} className="w-full p-2 text-xl tracking-widest border border-gray-300 dark:border-gray-700 dark:bg-gray-800 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 appearance-none bg-white dark:bg-gray-800 text-yellow-500 transition-colors">
+                    <select value={lang.level} onChange={(e) => updateArrayItem('resumeLanguages', lang.id, { level: Number(e.target.value) })} className="w-full p-2 text-base sm:text-xl tracking-normal sm:tracking-widest border border-gray-300 dark:border-gray-700 dark:bg-gray-800 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 appearance-none bg-white dark:bg-gray-800 text-yellow-500 transition-colors">
                       <option value={1}>★☆☆</option>
                       <option value={2}>★★☆</option>
                       <option value={3}>★★★</option>

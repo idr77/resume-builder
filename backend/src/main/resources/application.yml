@@ -28,3 +28,6 @@ app:
 
 server:
   port: 8080
+  tomcat:
+    max-swallow-size: 50MB
+    max-http-form-post-size: 50MB

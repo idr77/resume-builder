@@ -32,8 +32,17 @@ public class AuthController {
     }
 
     @PostMapping("/signup")
+    @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<?> registerUser(@RequestBody AuthRequest signupRequest) {
-        if (userRepository.existsByEmail(signupRequest.email())) {
+        User existing = userRepository.findByEmail(signupRequest.email()).orElse(null);
+        if (existing != null) {
+            if (passwordEncoder.matches(signupRequest.password(), existing.getPasswordHash())) {
+                if (quotaRepository.findByUserId(existing.getId()).isEmpty()) {
+                    quotaRepository.save(new UserTokensQuota(existing, 50000, "FREE"));
+                }
+                String token = jwtUtils.generateToken(existing.getEmail(), existing.getId());
+                return ResponseEntity.ok(new AuthResponse(token, existing.getId(), existing.getEmail()));
+            }
             return ResponseEntity.badRequest().body(Map.of("error", "Cet email est déjà utilisé."));
         }
 
