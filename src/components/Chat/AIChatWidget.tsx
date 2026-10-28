@@ -387,12 +387,12 @@ export default function AIChatWidget({
                     className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs shadow-sm ${
                       isUser
                         ? 'bg-indigo-600 text-white rounded-tr-sm'
-                        : 'bg-white dark:bg-gray-850 border border-gray-200 dark:border-gray-800 text-gray-900 dark:text-gray-100 rounded-tl-sm'
+                        : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-gray-100 rounded-tl-sm'
                     }`}
                   >
                     {!isUser ? (
                       <div>
-                        <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-gray-100 dark:border-gray-800/80 text-[10px] text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-gray-100 dark:border-gray-700/80 text-[10px] text-gray-500 dark:text-gray-400">
                           <span className="flex items-center gap-1 font-semibold text-indigo-600 dark:text-indigo-400">
                             <Bot size={12} />
                             Assistant IA
@@ -422,7 +422,7 @@ export default function AIChatWidget({
 
             {loading && (
               <div className="flex justify-start">
-                <div className="bg-white dark:bg-gray-850 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-xs shadow-sm flex items-center gap-2">
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-xs shadow-sm flex items-center gap-2">
                   <div className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }} />
                     <span className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }} />

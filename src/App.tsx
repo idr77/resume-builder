@@ -521,7 +521,7 @@ function App() {
               className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
                 showStyleControls
                   ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700'
-                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750'
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
               }`}
               title={resumeData.language === 'fr' ? 'Ajuster les styles, couleurs et modèles' : 'Adjust styles and templates'}
             >
@@ -807,7 +807,7 @@ function App() {
                     <button
                       type="button"
                       onClick={() => setShowLivePreviewInEditor(prev => !prev)}
-                      className="hidden xl:flex items-center gap-1.5 text-[11px] sm:text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full font-medium border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-750 transition cursor-pointer"
+                      className="hidden xl:flex items-center gap-1.5 text-[11px] sm:text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full font-medium border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition cursor-pointer"
                       title={showLivePreviewInEditor ? 'Masquer l’aperçu PDF latéral' : 'Afficher l’aperçu PDF en direct côte-à-côte'}
                     >
                       <Columns size={12} className="text-indigo-500" />

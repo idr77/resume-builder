@@ -1635,7 +1635,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
                 type="button"
                 onClick={handleGenerateSalaryEstimate}
                 disabled={isEstimatingSalary || !compContractType}
-                className="flex items-center gap-1 bg-indigo-600 text-white dark:bg-indigo-500 hover:opacity-90 px-3 py-1.5 rounded-full font-bold text-[10px] transition cursor-pointer disabled:opacity-50 disabled:bg-gray-200 dark:disabled:bg-gray-850 dark:disabled:text-gray-500"
+                className="flex items-center gap-1 bg-indigo-600 text-white dark:bg-indigo-500 hover:opacity-90 px-3 py-1.5 rounded-full font-bold text-[10px] transition cursor-pointer disabled:opacity-50 disabled:bg-gray-200 dark:disabled:bg-gray-800 dark:disabled:text-gray-500"
               >
                 {isEstimatingSalary ? (
                   <><Loader2 size={12} className="animate-spin" /> {isFrench ? 'Analyse...' : 'Analyzing...'}</>
@@ -1695,7 +1695,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
             </div>
 
             {compContractType === 'cdi' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-gray-50 dark:bg-gray-950/40 rounded-lg border border-gray-150 dark:border-gray-850 animate-fade-in">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-gray-50 dark:bg-gray-950/40 rounded-lg border border-gray-200 dark:border-gray-800 animate-fade-in">
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">
                     {isFrench ? 'MES ATTENTES (ANNUEL BRUT €)' : 'MY EXPECTATIONS (ANNUAL GROSS €)'}
@@ -1724,7 +1724,7 @@ export default function ApplicationDetail({ application, activeResumeData, onBac
             )}
 
             {compContractType === 'freelance' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-gray-50 dark:bg-gray-950/40 rounded-lg border border-gray-150 dark:border-gray-850 animate-fade-in">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-gray-50 dark:bg-gray-950/40 rounded-lg border border-gray-200 dark:border-gray-800 animate-fade-in">
                 <div>
                   <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">
                     {isFrench ? 'MON TJM SOUHAITÉ (€/JOUR)' : 'MY DESIRED TJM (€/DAY)'}

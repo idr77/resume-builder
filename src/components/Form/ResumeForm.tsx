@@ -649,7 +649,7 @@ export default function ResumeForm({ data, onChange, missingKeywords = [], activ
                         key={recSkill}
                         type="button"
                         onClick={() => handleAddSkill(recSkill)}
-                        className="text-[10px] bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 dark:bg-gray-850/50 dark:text-gray-400 dark:hover:bg-gray-800 dark:border-gray-700/60 px-2 py-0.5 rounded transition cursor-pointer font-semibold"
+                        className="text-[10px] bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:border-gray-700 px-2 py-0.5 rounded transition cursor-pointer font-semibold"
                       >
                         + {recSkill}
                       </button>
