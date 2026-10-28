@@ -1,5 +1,49 @@
 import { deduplicateSynonyms } from './atsOptimizer';
 
+export interface GeminiModelOption {
+  id: string;
+  name: string;
+  badge: string;
+  description: string;
+}
+
+export const AVAILABLE_GEMINI_MODELS: GeminiModelOption[] = [
+  {
+    id: 'gemini-3.8-flash',
+    name: 'Gemini 3.8 Flash',
+    badge: 'Recommandé',
+    description: 'Rapide, équilibré et optimisé pour le texte de CV et l’ATS.',
+  },
+  {
+    id: 'gemini-3.5-flash-lite',
+    name: 'Gemini 3.5 Flash Lite',
+    badge: 'Ultra rapide',
+    description: 'Modèle ultra rapide, économique et réactif.',
+  },
+  {
+    id: 'gemini-4-argon',
+    name: 'Gemini 4 Argon',
+    badge: 'Avancé',
+    description: 'Raisonnement supérieur pour analyses de poste pointues.',
+  },
+];
+
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
+
+export const getSelectedGeminiModel = (): string => {
+  return localStorage.getItem('gemini_model') || DEFAULT_GEMINI_MODEL;
+};
+
+export const setSelectedGeminiModel = (modelId: string): void => {
+  localStorage.setItem('gemini_model', modelId.trim());
+  window.dispatchEvent(new Event('gemini_model_changed'));
+};
+
+export const getGeminiApiEndpoint = (apiKey: string, modelOverride?: string): string => {
+  const model = modelOverride || getSelectedGeminiModel();
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+};
+
 export const rewriteExperienceWithGemini = async (
   apiKey: string,
   originalText: string,
@@ -12,8 +56,8 @@ export const rewriteExperienceWithGemini = async (
     throw new Error('Gemini API Key is missing. Please add it in settings.');
   }
 
-  // Using a stable fast model
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  // Using configured dynamic model
+  const endpoint = getGeminiApiEndpoint(apiKey);
 
   const langInstruction = language === 'fr' 
     ? 'Write the response entirely in French.' 
@@ -90,7 +134,7 @@ export const rewriteSkillsWithGemini = async (
     throw new Error('Gemini API Key is missing. Please add it in settings.');
   }
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const endpoint = getGeminiApiEndpoint(apiKey);
 
   const langInstruction = language === 'fr' 
     ? 'Write the response entirely in French.' 
@@ -162,7 +206,7 @@ export const translateResumeWithGemini = async (
   }
 
   // Using a stable fast model
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const endpoint = getGeminiApiEndpoint(apiKey);
 
   const langInstruction = targetLanguage === 'fr' 
     ? 'Translate ALL content into rigorous professional French.' 
@@ -228,7 +272,7 @@ export const generateSkillsFromExperienceWithGemini = async (
   if (!apiKey) throw new Error('Gemini API Key is missing. Please add it in settings.');
   if (experiences.length === 0) return '';
   
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const endpoint = getGeminiApiEndpoint(apiKey);
   const langInstruction = language === 'fr' ? 'French' : 'English';
   
   const expText = experiences.map(e => `Role: ${e.role}\nCompany: ${e.company}\nDescription: ${e.description}`).join('\n\n');
@@ -285,7 +329,7 @@ export const extractKeywordsWithGemini = async (
   if (!apiKey) throw new Error('Gemini API Key is missing.');
   if (!jobDescription) return [];
   
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const endpoint = getGeminiApiEndpoint(apiKey);
   
   const prompt = `
 Task: Analyze the following job description and extract a highly refined list of key technical stacks, methodologies, and core soft skills.
@@ -346,7 +390,7 @@ export const globalOptimizeResumeWithGemini = async (
 ): Promise<string> => {
   if (!apiKey) throw new Error('Gemini API Key is missing.');
   
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const endpoint = getGeminiApiEndpoint(apiKey);
   const langInstruction = language === 'fr' ? 'French' : 'English';
   
   const prompt = `
@@ -401,7 +445,7 @@ export const generateCoverLetterWithGemini = async (
 ): Promise<string> => {
     if (!apiKey) throw new Error('Gemini API Key is missing.');
     
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const endpoint = getGeminiApiEndpoint(apiKey);
     const langInstruction = language === 'fr' ? 'French' : 'English';
     
 
@@ -488,7 +532,7 @@ export const generateInterviewPrepWithGemini = async (
 ): Promise<string> => {
   if (!apiKey) throw new Error('Gemini API Key is missing.');
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const endpoint = getGeminiApiEndpoint(apiKey);
 
   const dossierSection = skillsDossierText && skillsDossierText.trim()
     ? `\nCandidate Master Background Document (Dossier de compétences) :\n${skillsDossierText.trim()}\n`
@@ -549,7 +593,7 @@ export const generateAtsAdviceWithGemini = async (
   userPrompt: string
 ): Promise<string> => {
   if (!apiKey) throw new Error('Gemini API Key is missing.');
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+  const endpoint = getGeminiApiEndpoint(apiKey);
 
   try {
     const response = await fetch(endpoint, {

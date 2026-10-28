@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { getTranslation } from '../../i18n/translations';
 import type { Language } from '../../types/resume';
 import { apiService } from '../../utils/apiService';
-import { Cloud, CloudOff, RefreshCw, Loader2, LogOut, CheckCircle, Database, Download, Upload } from 'lucide-react';
+import {
+  AVAILABLE_GEMINI_MODELS,
+  getSelectedGeminiModel,
+  setSelectedGeminiModel,
+} from '../../utils/geminiApiService';
+import { Cloud, CloudOff, RefreshCw, Loader2, LogOut, CheckCircle, Database, Download, Upload, Cpu, Sparkles } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
@@ -12,6 +17,9 @@ interface Props {
 
 export default function SettingsModal({ isOpen, onClose, language }: Props) {
   const [apiKey, setApiKey] = useState('');
+  const [selectedModel, setSelectedModel] = useState<string>(() => getSelectedGeminiModel());
+  const [isCustomModel, setIsCustomModel] = useState(false);
+  const [customModelInput, setCustomModelInput] = useState('');
   const [storageSize, setStorageSize] = useState(0); // KB
   const [historySize, setHistorySize] = useState(0); // KB
   const [trackerSize, setTrackerSize] = useState(0); // KB
@@ -57,6 +65,11 @@ export default function SettingsModal({ isOpen, onClose, language }: Props) {
   useEffect(() => {
     if (isOpen) {
       setApiKey(localStorage.getItem('gemini_api_key') || '');
+      const curModel = getSelectedGeminiModel();
+      setSelectedModel(curModel);
+      const isPredefined = AVAILABLE_GEMINI_MODELS.some(m => m.id === curModel);
+      setIsCustomModel(!isPredefined);
+      if (!isPredefined) setCustomModelInput(curModel);
       calculateStorageSizes();
       checkBackendHealthAndAuth();
     }
@@ -68,6 +81,10 @@ export default function SettingsModal({ isOpen, onClose, language }: Props) {
   const handleSave = async () => {
     const trimmedKey = apiKey.trim();
     localStorage.setItem('gemini_api_key', trimmedKey);
+
+    const finalModel = isCustomModel ? (customModelInput.trim() || 'gemini-3.8-flash') : selectedModel;
+    setSelectedGeminiModel(finalModel);
+
     if (isServerOnline && isLoggedIn && trimmedKey) {
       try {
         await apiService.saveApiKey(trimmedKey);
@@ -382,6 +399,84 @@ export default function SettingsModal({ isOpen, onClose, language }: Props) {
                 ? "Votre clé est stockée localement dans votre navigateur. En mode Cloud, vous pouvez également utiliser votre clé personnelle ou consommer le crédit de jetons du serveur."
                 : "Your key is stored locally in your browser. In Cloud mode, you can use your own key or consume token credits on the server."}
             </p>
+          </div>
+
+          {/* Section: Gemini Model Selection */}
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Cpu size={14} className="text-indigo-500" />
+                {language === 'fr' ? 'Modèle IA (Google Gemini)' : 'AI Model (Google Gemini)'}
+              </label>
+              <span className="text-[10px] text-gray-400">
+                {isCustomModel ? 'Modèle libre' : selectedModel}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {AVAILABLE_GEMINI_MODELS.map((model) => {
+                const isSelected = !isCustomModel && selectedModel === model.id;
+                return (
+                  <button
+                    key={model.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedModel(model.id);
+                      setIsCustomModel(false);
+                    }}
+                    className={`w-full text-left p-2.5 rounded-lg border text-xs transition-all flex items-start justify-between gap-2 cursor-pointer ${
+                      isSelected
+                        ? 'border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200 ring-1 ring-indigo-500'
+                        : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">{model.name}</span>
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider ${
+                          model.badge === 'Recommandé'
+                            ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                            : 'bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300'
+                        }`}>
+                          {model.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">
+                        {model.description}
+                      </p>
+                    </div>
+                    <div className="pt-0.5">
+                      <div className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center ${
+                        isSelected ? 'border-indigo-600 bg-indigo-600' : 'border-gray-300 dark:border-gray-700'
+                      }`}>
+                        {isSelected && <span className="w-1.5 h-1.5 bg-white rounded-full" />}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+
+              {/* Custom Model Toggle */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setIsCustomModel(prev => !prev)}
+                  className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <Sparkles size={11} />
+                  <span>{language === 'fr' ? 'Spécifier un identifiant de modèle personnalisé' : 'Specify custom model ID'}</span>
+                </button>
+                {isCustomModel && (
+                  <input
+                    type="text"
+                    value={customModelInput}
+                    onChange={(e) => setCustomModelInput(e.target.value)}
+                    placeholder="ex: gemini-3.8-flash, gemini-4-argon, etc."
+                    className="w-full mt-2 p-2 bg-white text-gray-900 border border-indigo-300 dark:border-indigo-700 dark:bg-gray-950 dark:text-gray-100 rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+                  />
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Section: Storage sizes and operations */}

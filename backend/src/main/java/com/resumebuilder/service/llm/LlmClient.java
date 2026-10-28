@@ -10,6 +10,10 @@ public interface LlmClient {
      */
     String generateResponse(String systemPrompt, String userPrompt, String apiKey);
     
+    default String generateResponse(String systemPrompt, String userPrompt, String apiKey, String model) {
+        return generateResponse(systemPrompt, userPrompt, apiKey);
+    }
+    
     /**
      * Estime le coût en jetons d'une requête/réponse.
      */

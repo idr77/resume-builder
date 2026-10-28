@@ -40,6 +40,7 @@ public class LlmController {
         String userPrompt = payload.get("userPrompt");
         String provider = payload.getOrDefault("provider", "GEMINI");
         String apiKey = payload.get("apiKey");
+        String model = payload.get("model");
 
         if (userPrompt == null || userPrompt.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Le paramètre userPrompt est obligatoire."));
@@ -49,7 +50,7 @@ public class LlmController {
             if (apiKey != null && !apiKey.trim().isEmpty()) {
                 aiGatewayService.saveUserApiKey(userId, provider, apiKey.trim());
             }
-            String aiResponse = aiGatewayService.requestAiService(userId, systemPrompt, userPrompt, provider);
+            String aiResponse = aiGatewayService.requestAiService(userId, systemPrompt, userPrompt, provider, model);
             return ResponseEntity.ok(Map.of("response", aiResponse));
         } catch (IllegalStateException ex) {
             // Insufficient quota (tokens balance exhausted)

@@ -20,6 +20,11 @@ import {
   sendAiChatMessage,
   type ChatMessage,
 } from '../../utils/aiChatService';
+import {
+  AVAILABLE_GEMINI_MODELS,
+  getSelectedGeminiModel,
+  setSelectedGeminiModel,
+} from '../../utils/geminiApiService';
 import MarkdownRenderer from '../Common/MarkdownRenderer';
 import { apiService } from '../../utils/apiService';
 
@@ -51,19 +56,25 @@ export default function AIChatWidget({
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('gemini_api_key') || '');
+  const [currentModel, setCurrentModel] = useState<string>(() => getSelectedGeminiModel());
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [keyDraft, setKeyDraft] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Sync API Key from localStorage
+  // Sync API Key & Model from localStorage / events
   useEffect(() => {
-    const syncKey = () => {
+    const syncSettings = () => {
       setApiKey(localStorage.getItem('gemini_api_key') || '');
+      setCurrentModel(getSelectedGeminiModel());
     };
-    window.addEventListener('storage', syncKey);
-    return () => window.removeEventListener('storage', syncKey);
+    window.addEventListener('storage', syncSettings);
+    window.addEventListener('gemini_model_changed', syncSettings);
+    return () => {
+      window.removeEventListener('storage', syncSettings);
+      window.removeEventListener('gemini_model_changed', syncSettings);
+    };
   }, []);
 
   // Save messages to sessionStorage
@@ -115,6 +126,7 @@ export default function AIChatWidget({
         history: messages,
         userMessage: textToSend,
         apiKey: apiKey.trim(),
+        model: currentModel,
         isCloudConnected: isCloud,
       });
 
@@ -458,9 +470,29 @@ export default function AIChatWidget({
                 <Send size={14} />
               </button>
             </div>
-            <div className="flex items-center justify-between mt-1.5 px-1 text-[10px] text-gray-400 dark:text-gray-500 select-none">
-              <span>Entrée pour envoyer, Maj+Entrée saut de ligne</span>
-              <span>Modèle Gemini 2.5</span>
+            <div className="flex items-center justify-between mt-1.5 px-1 text-[10px] text-gray-400 dark:text-gray-500">
+              <span className="hidden sm:inline">Entrée pour envoyer</span>
+              <div className="flex items-center gap-1.5 ml-auto">
+                <span className="text-[9px] text-gray-400 dark:text-gray-500 uppercase tracking-wider font-semibold">Modèle :</span>
+                <select
+                  value={currentModel}
+                  onChange={(e) => {
+                    const nextModel = e.target.value;
+                    setCurrentModel(nextModel);
+                    setSelectedGeminiModel(nextModel);
+                  }}
+                  className="bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-[10px] rounded px-1.5 py-0.5 border border-gray-200 dark:border-gray-700 focus:outline-none cursor-pointer font-medium"
+                >
+                  {AVAILABLE_GEMINI_MODELS.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                  {!AVAILABLE_GEMINI_MODELS.some(m => m.id === currentModel) && (
+                    <option value={currentModel}>{currentModel}</option>
+                  )}
+                </select>
+              </div>
             </div>
           </div>
         </div>

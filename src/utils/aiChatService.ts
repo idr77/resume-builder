@@ -1,6 +1,7 @@
 import type { ResumeData } from '../types/resume';
 import type { JobApplication } from '../types/tracker';
 import { apiService } from './apiService';
+import { getGeminiApiEndpoint, getSelectedGeminiModel } from './geminiApiService';
 
 export interface ChatMessage {
   id: string;
@@ -15,6 +16,7 @@ export interface ChatRequestOptions {
   history: ChatMessage[];
   userMessage: string;
   apiKey?: string;
+  model?: string;
   isCloudConnected?: boolean;
 }
 
@@ -146,15 +148,17 @@ export const sendAiChatMessage = async ({
   history,
   userMessage,
   apiKey,
+  model,
   isCloudConnected = false,
 }: ChatRequestOptions): Promise<string> => {
+  const activeModel = model || getSelectedGeminiModel();
   const systemPrompt = buildAiChatSystemPrompt(resumeData, application);
   const userPrompt = buildChatPromptWithHistory(history, userMessage);
 
-  // If connected to Cloud backend, use proxyLlm
+  // If connected to Cloud backend, use proxyLlm with selected model
   if (isCloudConnected && apiService.isLoggedIn()) {
     try {
-      const response = await apiService.proxyLlm(systemPrompt, userPrompt, 'GEMINI');
+      const response = await apiService.proxyLlm(systemPrompt, userPrompt, 'GEMINI', activeModel);
       if (response && response.trim()) {
         return response.trim();
       }
@@ -177,7 +181,7 @@ export const sendAiChatMessage = async ({
     );
   }
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${activeKey.trim()}`;
+  const endpoint = getGeminiApiEndpoint(activeKey.trim(), activeModel);
 
   const response = await fetch(endpoint, {
     method: 'POST',

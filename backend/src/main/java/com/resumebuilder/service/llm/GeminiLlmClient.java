@@ -13,7 +13,13 @@ public class GeminiLlmClient implements LlmClient {
 
     @Override
     public String generateResponse(String systemPrompt, String userPrompt, String apiKey) {
-        String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
+        return generateResponse(systemPrompt, userPrompt, apiKey, "gemini-3.8-flash");
+    }
+
+    @Override
+    public String generateResponse(String systemPrompt, String userPrompt, String apiKey, String model) {
+        String activeModel = (model != null && !model.isBlank()) ? model.trim() : "gemini-3.8-flash";
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/" + activeModel + ":generateContent?key=" + apiKey;
         
         try {
             // Build request structure robustly using nested Maps

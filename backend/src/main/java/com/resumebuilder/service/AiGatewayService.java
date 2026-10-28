@@ -65,6 +65,11 @@ public class AiGatewayService {
 
     @Transactional
     public String requestAiService(UUID userId, String systemPrompt, String userPrompt, String preferredProvider) {
+        return requestAiService(userId, systemPrompt, userPrompt, preferredProvider, null);
+    }
+
+    @Transactional
+    public String requestAiService(UUID userId, String systemPrompt, String userPrompt, String preferredProvider, String model) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable."));
 
@@ -81,7 +86,7 @@ public class AiGatewayService {
                 );
                 
                 LlmClient client = (LlmClient) context.getBean(preferredProvider);
-                return client.generateResponse(systemPrompt, userPrompt, plainKey);
+                return client.generateResponse(systemPrompt, userPrompt, plainKey, model);
             } catch (Exception ex) {
                 throw new RuntimeException("Échec du déchiffrement de votre clé d'API personnelle : " + ex.getMessage(), ex);
             }
@@ -116,7 +121,7 @@ public class AiGatewayService {
 
         // Default global client is Google Gemini
         LlmClient defaultClient = (LlmClient) context.getBean("GEMINI");
-        String response = defaultClient.generateResponse(systemPrompt, userPrompt, globalGeminiKey);
+        String response = defaultClient.generateResponse(systemPrompt, userPrompt, globalGeminiKey, model);
 
         // Adjust real cost after response is completed
         int realCost = defaultClient.estimateTokenCost(systemPrompt + userPrompt, response);

@@ -214,12 +214,13 @@ class ApiService {
   }
 
   // Proxy LLM Service
-  async proxyLlm(systemPrompt: string, userPrompt: string, provider = 'GEMINI'): Promise<string> {
+  async proxyLlm(systemPrompt: string, userPrompt: string, provider = 'GEMINI', model?: string): Promise<string> {
     const localApiKey = localStorage.getItem('gemini_api_key') || undefined;
+    const selectedModel = model || localStorage.getItem('gemini_model') || 'gemini-3.8-flash';
     const response = await fetch(`${API_BASE_URL}/llm/proxy`, {
       method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify({ systemPrompt, userPrompt, provider, apiKey: localApiKey }),
+      body: JSON.stringify({ systemPrompt, userPrompt, provider, apiKey: localApiKey, model: selectedModel }),
     });
     const data = await response.json();
     if (!response.ok) {
