@@ -12,7 +12,8 @@ import OptimizationDashboard from './components/Preview/OptimizationDashboard';
 import { analyzeResumeMatch } from './utils/atsOptimizer';
 import { translateResumeWithGemini } from './utils/geminiApiService';
 import { compressImage } from './utils/imageCompressor';
-import { Settings, Languages, Loader2, Sun, Moon, Briefcase, FileText as FileIcon, Cloud, LogOut, Eye } from 'lucide-react';
+import { Settings, Languages, Loader2, Sun, Moon, Briefcase, FileText as FileIcon, Cloud, LogOut, Eye, Target, FolderOpen, Palette, Columns, ChevronDown } from 'lucide-react';
+import VersionManager from './components/Form/VersionManager';
 import ApplicationTracker from './components/Tracker/ApplicationTracker';
 import ApplicationDetail from './components/Tracker/ApplicationDetail';
 import CloudLoginPage from './components/Auth/CloudLoginPage';
@@ -61,8 +62,13 @@ function App() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [aiKeywords, setAiKeywords] = useState<string[]>([]); // New state for AI keywords
   const [previewTab, setPreviewTab] = useState<'cv' | 'cl'>('cv');
-  const [appMode, setAppMode] = useState<'cv' | 'tracker'>('cv');
-  const [mobilePanel, setMobilePanel] = useState<'editor' | 'preview'>('editor');
+  const [workflowTab, setWorkflowTab] = useState<'editor' | 'ats' | 'preview' | 'tracker'>('editor');
+  const [showLivePreviewInEditor, setShowLivePreviewInEditor] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') return window.innerWidth >= 1280;
+    return false;
+  });
+  const [showStyleControls, setShowStyleControls] = useState<boolean>(false);
+  const [showVersionModal, setShowVersionModal] = useState<boolean>(false);
   const [selectedApplication, setSelectedApplication] = useState<JobApplication | null>(null);
   const [cloudState, setCloudState] = useState<'checking' | 'online' | 'offline'>('checking');
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => apiService.isLoggedIn());
@@ -477,118 +483,412 @@ function App() {
     );
   }
 
-  return (
-    <div className="flex flex-col lg:flex-row h-[100dvh] bg-gray-50 dark:bg-gray-950 font-sans overflow-hidden transition-colors duration-200">
-      {/* Sidebar / Form Area */}
-      <div className={`w-full lg:w-1/2 flex flex-col lg:border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 transition-colors ${mobilePanel === 'preview' ? 'shrink-0 lg:flex-1' : 'flex-1 min-h-0'}`}>
-        <header className="px-3 sm:px-6 py-2.5 sm:py-3.5 border-b border-gray-200 dark:border-gray-800 flex flex-wrap justify-between items-center gap-2 bg-gray-900 text-white shadow-md z-10 shrink-0">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <h1 className="text-base sm:text-lg font-bold tracking-wide hidden xl:block">{t.title}</h1>
-            <div className="flex bg-gray-800 p-0.5 rounded border border-gray-700">
-              <button 
-                onClick={() => { setAppMode('cv'); setMobilePanel('editor'); }}
-                className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded text-xs transition-colors cursor-pointer font-medium ${appMode === 'cv' && mobilePanel === 'editor' ? 'bg-indigo-600 text-white' : appMode === 'cv' ? 'lg:bg-indigo-600 text-gray-300 lg:text-white hover:text-white' : 'text-gray-300 hover:text-white'}`}
-                title={resumeData.language === 'fr' ? 'Rédacteur de CV' : 'Resume Editor'}
-              >
-                <FileIcon size={12} />
-                <span>{resumeData.language === 'fr' ? 'CV & Lettre' : 'CV & Letter'}</span>
-              </button>
-              <button 
-                onClick={() => { setAppMode('tracker'); setMobilePanel('editor'); }}
-                className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded text-xs transition-colors cursor-pointer font-medium ${appMode === 'tracker' && mobilePanel === 'editor' ? 'bg-indigo-600 text-white' : appMode === 'tracker' ? 'lg:bg-indigo-600 text-gray-300 lg:text-white hover:text-white' : 'text-gray-300 hover:text-white'}`}
-                title={resumeData.language === 'fr' ? 'Suivi des candidatures' : 'Applications Tracker'}
-              >
-                <Briefcase size={12} />
-                <span>{resumeData.language === 'fr' ? 'Candidatures' : 'Tracker'}</span>
-              </button>
-            </div>
+  const renderPdfStudio = (compactHeader = false) => (
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-gray-100 dark:bg-gray-950 transition-colors">
+      <header className={`${compactHeader ? 'px-3 py-1.5' : 'px-3 sm:px-6 py-2.5 sm:py-3'} border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-xs flex flex-wrap items-center justify-between gap-2 transition-colors shrink-0`}>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {/* Tab switch: CV vs Lettre */}
+          <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setPreviewTab('cv')}
+              className={`px-2.5 sm:px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                previewTab === 'cv'
+                  ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              📄 {resumeData.language === 'fr' ? 'Mon CV' : 'My CV'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewTab('cl')}
+              className={`px-2.5 sm:px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                previewTab === 'cl'
+                  ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              ✉️ {resumeData.language === 'fr' ? 'Lettre' : 'Cover Letter'}
+            </button>
           </div>
-          <div className="flex flex-wrap gap-1.5 sm:gap-2.5 items-center text-xs sm:text-sm font-medium">
-            {isTranslating ? (
-              <span className="flex items-center text-yellow-400 bg-gray-800 px-2.5 py-1 rounded text-xs animate-pulse">
-                <Loader2 size={14} className="animate-spin mr-1.5" /> {t.translating}
+
+          {/* Toggle Style Controls Button */}
+          {previewTab === 'cv' && (
+            <button
+              type="button"
+              onClick={() => setShowStyleControls(prev => !prev)}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                showStyleControls
+                  ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700'
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750'
+              }`}
+              title={resumeData.language === 'fr' ? 'Ajuster les styles, couleurs et modèles' : 'Adjust styles and templates'}
+            >
+              <Palette size={13} className="text-indigo-500" />
+              <span>{resumeData.language === 'fr' ? 'Style & Design' : 'Style & Design'}</span>
+              <ChevronDown size={12} className={`transition-transform duration-200 ${showStyleControls ? 'rotate-180' : ''}`} />
+            </button>
+          )}
+
+          {isGeneratingPreview && (
+            <span className="flex items-center gap-1.5 text-[10px] text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1 rounded-full font-medium border border-indigo-100 dark:border-indigo-900/50 animate-pulse">
+              <Loader2 size={11} className="animate-spin text-indigo-500" />
+              <span>{resumeData.language === 'fr' ? 'Calcul...' : 'Syncing...'}</span>
+            </span>
+          )}
+
+          {cvSaveStatus !== 'idle' && (
+            <span className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-semibold border ${
+              cvSaveStatus === 'saving'
+                ? 'text-amber-600 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/60 animate-pulse'
+                : cvSaveStatus === 'saved'
+                ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/60'
+                : 'text-red-600 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/60'
+            }`}>
+              <span>
+                {cvSaveStatus === 'saving' && (resumeData.language === 'fr' ? 'Enregistrement...' : 'Saving...')}
+                {cvSaveStatus === 'saved' && (resumeData.language === 'fr' ? 'Enregistré' : 'Saved')}
+                {cvSaveStatus === 'error' && (resumeData.language === 'fr' ? 'Erreur' : 'Error')}
               </span>
-            ) : (
-              <div className="flex items-center gap-0.5 sm:gap-1 bg-gray-800 p-0.5 rounded" title={t.translateResume}>
-                <span className="text-gray-400 px-1.5 flex items-center text-xs uppercase">
-                  <Languages size={13} className="sm:mr-1" />
-                  <span className="hidden 2xl:inline">{t.translateResume}:</span>
-                </span>
-                <button 
-                  className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[11px] sm:text-xs transition-colors hover:bg-gray-700 text-gray-300 cursor-pointer"
-                  onClick={() => handleTranslate('en')}
-                >
-                  EN
-                </button>
-                <button 
-                  className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[11px] sm:text-xs transition-colors hover:bg-gray-700 text-gray-300 cursor-pointer"
-                  onClick={() => handleTranslate('fr')}
-                >
-                  FR
-                </button>
-              </div>
-            )}
-            
-            <div className="h-5 w-px bg-gray-700 hidden sm:block"></div>
- 
-            <button 
-              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-              className="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-300 hover:text-white cursor-pointer"
-              title={resumeData.language === 'fr' ? 'Changer de thème' : 'Switch Theme'}
-            >
-              {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
-            </button>
+            </span>
+          )}
+        </div>
 
-            <button 
-              onClick={() => setShowSettings(true)}
-              className="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-300 hover:text-white cursor-pointer"
-              title="Settings"
-            >
-              <Settings size={16} />
-            </button>
+        <PDFDownloadLink
+          document={memoizedPdfDocument}
+          fileName={
+            previewTab === 'cv'
+              ? `${resumeData.personalInfo.fullName.replace(/\s+/g, '_')}_Resume.pdf`
+              : `${resumeData.personalInfo.fullName.replace(/\s+/g, '_')}_Cover_Letter.pdf`
+          }
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 sm:px-4 py-1.5 rounded-lg shadow-xs text-xs font-semibold transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer"
+        >
+          {({ loading }) => (loading ? t.generatingPdf : t.downloadPdf)}
+        </PDFDownloadLink>
+      </header>
 
-            {cloudState === 'online' && isLoggedIn && (
-              <div className="flex items-center gap-1.5 bg-emerald-950/60 border border-emerald-800/70 text-emerald-300 px-2 py-1 rounded-full text-xs">
-                <Cloud size={13} className="text-emerald-400 shrink-0" />
-                <span className="hidden sm:inline max-w-[120px] truncate" title={apiService.getEmail()}>
-                  {apiService.getEmail()}
-                </span>
-                <button
-                  onClick={() => apiService.logout()}
-                  className="text-gray-400 hover:text-rose-400 transition-colors cursor-pointer"
-                  title={resumeData.language === 'fr' ? 'Se déconnecter' : 'Log out'}
-                >
-                  <LogOut size={13} />
-                </button>
-              </div>
+      {/* Collapsible Style Controls */}
+      {previewTab === 'cv' && showStyleControls && (
+        <div className="animate-in fade-in slide-in-from-top-2 duration-150 border-b border-gray-200 dark:border-gray-800">
+          <StyleControls
+            settings={resumeData.styleSettings || {
+              template: 'classic',
+              themeColor: 'slate',
+              fontFamily: 'Helvetica',
+              fontSize: 'medium'
+            }}
+            onChange={(newSettings) => setResumeData({ ...resumeData, styleSettings: newSettings })}
+            language={resumeData.language}
+          />
+        </div>
+      )}
+
+      {/* PDF Viewport */}
+      <main className="flex-1 min-h-[420px] overflow-hidden p-0 bg-gray-200 dark:bg-gray-900 flex flex-col transition-colors">
+        <PDFViewer width="100%" height="100%" className="border-none flex-1 min-h-[420px]">
+          {memoizedPdfDocument}
+        </PDFViewer>
+      </main>
+    </div>
+  );
+
+  return (
+    <div className="flex flex-col h-[100dvh] bg-gray-50 dark:bg-gray-950 font-sans overflow-hidden transition-colors duration-200">
+      {/* Top Main Navigation Bar */}
+      <header className="px-3 sm:px-6 py-2.5 sm:py-3 border-b border-gray-200 dark:border-gray-800 flex flex-wrap justify-between items-center gap-2 bg-gray-900 text-white shadow-md z-20 shrink-0">
+        {/* Left: Brand Logo & Version Trigger */}
+        <div className="flex items-center gap-2 sm:gap-4">
+          <h1 className="text-sm sm:text-base font-bold tracking-wide flex items-center gap-2">
+            <span className="text-indigo-400">ATS</span>
+            <span className="hidden sm:inline">ResumeBuilder</span>
+          </h1>
+
+          {/* Version Trigger Dropdown Button */}
+          <button
+            type="button"
+            onClick={() => setShowVersionModal(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-gray-800 hover:bg-gray-750 text-gray-200 border border-gray-700/80 transition-colors cursor-pointer"
+            title={resumeData.language === 'fr' ? 'Gérer les versions de CV' : 'Manage CV versions'}
+          >
+            <FolderOpen size={14} className="text-indigo-400 shrink-0" />
+            <span className="max-w-[110px] sm:max-w-[160px] truncate font-semibold">
+              {activeVersion?.name || (resumeData.language === 'fr' ? 'CV actif' : 'Active CV')}
+            </span>
+            {activeVersion && (activeVersion as any).isLocked && <span className="text-[10px]">🔒</span>}
+            <ChevronDown size={12} className="text-gray-400 shrink-0" />
+          </button>
+        </div>
+
+        {/* Center: Desktop Segmented Control Workflow Modes */}
+        <nav className="hidden md:flex bg-gray-800/90 p-1 rounded-xl border border-gray-700/80 gap-1 text-xs">
+          <button
+            type="button"
+            onClick={() => setWorkflowTab('editor')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+              workflowTab === 'editor'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-gray-300 hover:text-white hover:bg-gray-700/50'
+            }`}
+          >
+            <FileIcon size={14} />
+            <span>{resumeData.language === 'fr' ? 'Éditeur CV' : 'CV Editor'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setWorkflowTab('ats')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+              workflowTab === 'ats'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-gray-300 hover:text-white hover:bg-gray-700/50'
+            }`}
+          >
+            <Target size={14} />
+            <span>{resumeData.language === 'fr' ? 'Matching ATS' : 'ATS Matching'}</span>
+            {atsResult.targetKeywords.length > 0 && (
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                workflowTab === 'ats' ? 'bg-indigo-800 text-indigo-100' : 'bg-indigo-900/60 text-indigo-300'
+              }`}>
+                {atsResult.matchScore}%
+              </span>
             )}
-            <div className="flex gap-0.5 bg-gray-800 p-0.5 rounded text-xs">
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setWorkflowTab('preview')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+              workflowTab === 'preview'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-gray-300 hover:text-white hover:bg-gray-700/50'
+            }`}
+          >
+            <Eye size={14} />
+            <span>{resumeData.language === 'fr' ? 'Aperçu & Export' : 'Preview & Export'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setWorkflowTab('tracker')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+              workflowTab === 'tracker'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-gray-300 hover:text-white hover:bg-gray-700/50'
+            }`}
+          >
+            <Briefcase size={14} />
+            <span>{resumeData.language === 'fr' ? 'Candidatures' : 'Tracker'}</span>
+          </button>
+        </nav>
+
+        {/* Right: Actions, Theme, Language, Cloud, Settings */}
+        <div className="flex flex-wrap gap-1.5 sm:gap-2.5 items-center text-xs sm:text-sm font-medium">
+          {isTranslating ? (
+            <span className="flex items-center text-yellow-400 bg-gray-800 px-2.5 py-1 rounded text-xs animate-pulse">
+              <Loader2 size={14} className="animate-spin mr-1.5" /> {t.translating}
+            </span>
+          ) : (
+            <div className="flex items-center gap-0.5 sm:gap-1 bg-gray-800 p-0.5 rounded" title={t.translateResume}>
+              <span className="text-gray-400 px-1.5 flex items-center text-xs uppercase">
+                <Languages size={13} className="sm:mr-1" />
+                <span className="hidden 2xl:inline">{t.translateResume}:</span>
+              </span>
               <button 
-                className={`px-2 py-1 rounded transition-colors cursor-pointer ${resumeData.language === 'en' ? 'bg-blue-600 text-white shadow' : 'text-gray-300 hover:bg-gray-700'}`}
-                onClick={() => setResumeData({...resumeData, language: 'en'})}
+                type="button"
+                className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[11px] sm:text-xs transition-colors hover:bg-gray-700 text-gray-300 cursor-pointer"
+                onClick={() => handleTranslate('en')}
               >
                 EN
               </button>
               <button 
-                className={`px-2 py-1 rounded transition-colors cursor-pointer ${resumeData.language === 'fr' ? 'bg-blue-600 text-white shadow' : 'text-gray-300 hover:bg-gray-700'}`}
-                onClick={() => setResumeData({...resumeData, language: 'fr'})}
+                type="button"
+                className="px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-[11px] sm:text-xs transition-colors hover:bg-gray-700 text-gray-300 cursor-pointer"
+                onClick={() => handleTranslate('fr')}
               >
                 FR
               </button>
             </div>
-          </div>
-        </header>
+          )}
+          
+          <div className="h-5 w-px bg-gray-700 hidden sm:block"></div>
 
-        <main className={`${mobilePanel === 'preview' ? 'hidden lg:block' : 'block'} flex-1 overflow-y-auto p-3 sm:p-6 scroll-smooth bg-gray-50 dark:bg-gray-950 lg:border-r border-gray-200 dark:border-gray-800 shadow-inner`}>
-          {appMode === 'tracker' ? (
-            selectedApplication ? (
+          <button 
+            type="button"
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            className="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-300 hover:text-white cursor-pointer"
+            title={resumeData.language === 'fr' ? 'Changer de thème' : 'Switch Theme'}
+          >
+            {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => setShowSettings(true)}
+            className="p-1.5 rounded hover:bg-gray-800 transition-colors text-gray-300 hover:text-white cursor-pointer"
+            title="Settings"
+          >
+            <Settings size={16} />
+          </button>
+
+          {cloudState === 'online' && isLoggedIn && (
+            <div className="flex items-center gap-1.5 bg-emerald-950/60 border border-emerald-800/70 text-emerald-300 px-2 py-1 rounded-full text-xs">
+              <Cloud size={13} className="text-emerald-400 shrink-0" />
+              <span className="hidden sm:inline max-w-[120px] truncate" title={apiService.getEmail()}>
+                {apiService.getEmail()}
+              </span>
+              <button
+                type="button"
+                onClick={() => apiService.logout()}
+                className="text-gray-400 hover:text-rose-400 transition-colors cursor-pointer"
+                title={resumeData.language === 'fr' ? 'Se déconnecter' : 'Log out'}
+              >
+                <LogOut size={13} />
+              </button>
+            </div>
+          )}
+          <div className="flex gap-0.5 bg-gray-800 p-0.5 rounded text-xs">
+            <button 
+              type="button"
+              className={`px-2 py-1 rounded transition-colors cursor-pointer ${resumeData.language === 'en' ? 'bg-blue-600 text-white shadow-xs' : 'text-gray-300 hover:bg-gray-700'}`}
+              onClick={() => setResumeData({...resumeData, language: 'en'})}
+            >
+              EN
+            </button>
+            <button 
+              type="button"
+              className={`px-2 py-1 rounded transition-colors cursor-pointer ${resumeData.language === 'fr' ? 'bg-blue-600 text-white shadow-xs' : 'text-gray-300 hover:bg-gray-700'}`}
+              onClick={() => setResumeData({...resumeData, language: 'fr'})}
+            >
+              FR
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Workspace Body based on Active Workflow Tab */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* MODE 1: ÉDITEUR CV */}
+        {workflowTab === 'editor' && (
+          <div className="flex-1 flex flex-col xl:flex-row h-full overflow-hidden w-full">
+            <div className={`flex-1 flex flex-col overflow-y-auto p-3 sm:p-6 bg-gray-50 dark:bg-gray-950 transition-all ${
+              showLivePreviewInEditor ? 'xl:w-1/2 xl:border-r border-gray-200 dark:border-gray-800' : 'w-full'
+            }`}>
+              <div className={showLivePreviewInEditor ? 'w-full' : 'max-w-4xl mx-auto w-full'}>
+                {/* Editor Header Bar with Quick Import/Export and Live Preview Toggle */}
+                <div className="mb-4 flex justify-between items-center flex-wrap gap-2">
+                  <div>
+                    <h2 className="text-sm font-bold text-gray-800 dark:text-gray-200">
+                      {resumeData.language === 'fr' ? 'Rédaction du CV' : 'CV Editor'}
+                    </h2>
+                    <p className="text-gray-500 text-xs dark:text-gray-400">{t.subtitle}</p>
+                  </div>
+                  <div className="flex items-center flex-wrap gap-1.5 sm:gap-2">
+                    <label className="text-[11px] sm:text-xs bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full font-medium border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition cursor-pointer">
+                      {resumeData.language === 'fr' ? 'Importer JSON' : 'Import JSON'}
+                      <input type="file" accept=".json" className="hidden" onChange={handleFileUpload} />
+                    </label>
+                    <button 
+                      type="button"
+                      onClick={handleExport}
+                      className="text-[11px] sm:text-xs bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full font-medium border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition cursor-pointer"
+                    >
+                      {resumeData.language === 'fr' ? 'Exporter JSON' : 'Export JSON'}
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setShowImportOpen(true)}
+                      className="text-[11px] sm:text-xs bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full font-medium border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition cursor-pointer"
+                    >
+                      {t.quickImport}
+                    </button>
+
+                    {/* Wide Screen Side-by-Side Toggle Button */}
+                    <button
+                      type="button"
+                      onClick={() => setShowLivePreviewInEditor(prev => !prev)}
+                      className="hidden xl:flex items-center gap-1.5 text-[11px] sm:text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full font-medium border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-750 transition cursor-pointer"
+                      title={showLivePreviewInEditor ? 'Masquer l’aperçu PDF latéral' : 'Afficher l’aperçu PDF en direct côte-à-côte'}
+                    >
+                      <Columns size={12} className="text-indigo-500" />
+                      <span>{showLivePreviewInEditor ? (resumeData.language === 'fr' ? 'Pleine largeur' : 'Full width') : (resumeData.language === 'fr' ? 'Aperçu côte-à-côte' : 'Split preview')}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <ResumeForm 
+                  data={resumeData} 
+                  onChange={setResumeData} 
+                  missingKeywords={atsResult.missingKeywords} 
+                  activeVersion={activeVersion}
+                  setActiveVersion={setActiveVersion}
+                  onOpenVersions={() => setShowVersionModal(true)}
+                />
+              </div>
+            </div>
+
+            {/* Optional Live Side Preview in Editor on Wide Screens */}
+            {showLivePreviewInEditor && (
+              <div className="hidden xl:flex xl:w-1/2 h-full overflow-hidden flex-col">
+                {renderPdfStudio(true)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* MODE 2: MATCHING ATS & OFFRE D'EMPLOI */}
+        {workflowTab === 'ats' && (
+          <div className="flex-1 flex flex-col lg:flex-row h-full overflow-hidden w-full">
+            <div className="w-full lg:w-1/2 flex flex-col border-r border-gray-200 dark:border-gray-800 h-full overflow-y-auto bg-gray-50 dark:bg-gray-950 p-3 sm:p-6">
+              <div className="mb-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm sm:text-base font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                    <Target size={18} className="text-indigo-600 dark:text-indigo-400" />
+                    <span>{resumeData.language === 'fr' ? 'Atelier d’Optimisation ATS' : 'ATS Optimization Studio'}</span>
+                  </h2>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+                    Score : {atsResult.matchScore}%
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {resumeData.language === 'fr'
+                    ? "Collez la description de l'offre ciblée pour extraire les mots-clés décisifs et aligner votre CV en temps réel."
+                    : "Paste the targeted job description to extract decisive keywords and align your resume in real time."}
+                </p>
+              </div>
+
+              <OptimizationDashboard 
+                data={resumeData} 
+                onChange={setResumeData} 
+                result={atsResult} 
+                setAiKeywords={setAiKeywords} 
+              />
+            </div>
+
+            {/* Live Side PDF Preview in ATS Studio */}
+            <div className="hidden lg:flex lg:w-1/2 h-full overflow-hidden flex-col">
+              {renderPdfStudio(true)}
+            </div>
+          </div>
+        )}
+
+        {/* MODE 3: APERÇU & EXPORT PLEIN ÉCRAN */}
+        {workflowTab === 'preview' && (
+          <div className="flex-1 flex flex-col h-full overflow-hidden w-full">
+            {renderPdfStudio(false)}
+          </div>
+        )}
+
+        {/* MODE 4: SUIVI DES CANDIDATURES (TRACKER) */}
+        {workflowTab === 'tracker' && (
+          <div className="flex-1 overflow-y-auto p-3 sm:p-6 bg-gray-50 dark:bg-gray-950 h-full w-full">
+            {selectedApplication ? (
               <ApplicationDetail 
                 application={selectedApplication} 
                 activeResumeData={resumeData}
                 onBack={() => setSelectedApplication(null)}
                 onUpdate={async (updated) => {
                   setSelectedApplication(updated);
-                  // Securely sync to PostgreSQL if connected, otherwise fallback
                   try {
                     const online = await apiService.checkHealth();
                     if (online && apiService.isLoggedIn()) {
@@ -624,159 +924,66 @@ function App() {
                 onSelectApplication={setSelectedApplication} 
                 language={resumeData.language}
               />
-            )
-          ) : (
-            <>
-              <div className="mb-4 flex justify-between items-center flex-wrap gap-2">
-                <p className="text-gray-500 text-xs sm:text-sm dark:text-gray-400">{t.subtitle}</p>
-                <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                  <label className="text-[11px] sm:text-xs bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full font-medium border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition cursor-pointer">
-                    {resumeData.language === 'fr' ? 'Importer JSON' : 'Import JSON'}
-                    <input type="file" accept=".json" className="hidden" onChange={handleFileUpload} />
-                  </label>
-                  <button 
-                    onClick={handleExport}
-                    className="text-[11px] sm:text-xs bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full font-medium border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition cursor-pointer"
-                  >
-                    {resumeData.language === 'fr' ? 'Exporter JSON' : 'Export JSON'}
-                  </button>
-                  <button 
-                    onClick={() => setShowImportOpen(true)}
-                    className="text-[11px] sm:text-xs bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full font-medium border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition cursor-pointer"
-                  >
-                    {t.quickImport}
-                  </button>
-                </div>
-              </div>
-              <ResumeForm 
-                data={resumeData} 
-                onChange={setResumeData} 
-                missingKeywords={atsResult.missingKeywords} 
-                activeVersion={activeVersion}
-                setActiveVersion={setActiveVersion}
-              />
-            </>
-          )}
-        </main>
-      </div>
-
-      {/* Live Preview Area */}
-      <div className={`w-full lg:w-1/2 flex flex-col bg-gray-100 dark:bg-gray-950 transition-colors overflow-y-auto lg:overflow-hidden ${mobilePanel === 'preview' ? 'flex-1 min-h-0' : 'hidden lg:flex'}`}>
-        <OptimizationDashboard data={resumeData} onChange={setResumeData} result={atsResult} setAiKeywords={setAiKeywords} />
-
-        <header className="px-3 sm:px-6 py-2.5 sm:py-3.5 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm flex flex-wrap items-center justify-between gap-2 transition-colors shrink-0">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <div className="flex gap-1 sm:gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg transition-colors">
-              <button 
-                className={`px-2.5 sm:px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${previewTab === 'cv' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}
-                onClick={() => setPreviewTab('cv')}
-              >
-                📄 {resumeData.language === 'fr' ? 'Mon CV' : 'My CV'}
-              </button>
-              <button 
-                className={`px-2.5 sm:px-4 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${previewTab === 'cl' ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}
-                onClick={() => setPreviewTab('cl')}
-              >
-                ✉️ {resumeData.language === 'fr' ? 'Lettre' : 'Cover Letter'}
-              </button>
-            </div>
-            {isGeneratingPreview && (
-              <span className="flex items-center gap-1.5 text-[10px] text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1 rounded-full font-medium border border-indigo-100 dark:border-indigo-900/50 animate-pulse transition-all">
-                <Loader2 size={11} className="animate-spin text-indigo-500 dark:text-indigo-400" />
-                <span>{resumeData.language === 'fr' ? 'Synchronisation...' : 'Syncing...'}</span>
-              </span>
-            )}
-            {cvSaveStatus !== 'idle' && (
-              <span className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-semibold transition-all border ${
-                cvSaveStatus === 'saving' 
-                  ? 'text-amber-600 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/60 animate-pulse'
-                  : cvSaveStatus === 'saved'
-                  ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/60'
-                  : 'text-red-600 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/60'
-              }`}>
-                <span>
-                  {cvSaveStatus === 'saving' && (resumeData.language === 'fr' ? 'Enregistrement...' : 'Saving...')}
-                  {cvSaveStatus === 'saved' && (resumeData.language === 'fr' ? 'Enregistré' : 'Saved')}
-                  {cvSaveStatus === 'error' && (resumeData.language === 'fr' ? 'Erreur' : 'Error')}
-                </span>
-              </span>
             )}
           </div>
-
-          <PDFDownloadLink 
-            document={memoizedPdfDocument} 
-            fileName={previewTab === 'cv' 
-              ? `${resumeData.personalInfo.fullName.replace(/\s+/g, '_')}_Resume.pdf`
-              : `${resumeData.personalInfo.fullName.replace(/\s+/g, '_')}_Cover_Letter.pdf`
-            }
-            className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-md shadow-sm text-xs font-semibold transition-colors shrink-0"
-          >
-            {({ loading }) => (loading ? t.generatingPdf : t.downloadPdf)}
-          </PDFDownloadLink>
-        </header>
-
-        {previewTab === 'cv' && (
-          <StyleControls 
-            settings={resumeData.styleSettings || {
-              template: 'classic',
-              themeColor: 'slate',
-              fontFamily: 'Helvetica',
-              fontSize: 'medium'
-            }}
-            onChange={(newSettings) => setResumeData({ ...resumeData, styleSettings: newSettings })}
-            language={resumeData.language}
-          />
         )}
-        
-        <main className="flex-1 min-h-[460px] lg:min-h-0 overflow-hidden p-0 bg-gray-200 dark:bg-gray-900 flex flex-col transition-colors">
-          <PDFViewer width="100%" height="100%" className="border-none flex-1 min-h-[460px] lg:min-h-0">
-            {memoizedPdfDocument}
-          </PDFViewer>
-        </main>
       </div>
 
-      {/* Mobile / Small Screen Bottom Navigation Bar */}
-      <nav className="lg:hidden shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 grid grid-cols-3 z-20 shadow-lg">
+      {/* Mobile / Small Screen Bottom Navigation Bar (4 Modes) */}
+      <nav className="md:hidden shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 grid grid-cols-4 z-20 shadow-lg">
         <button
           type="button"
-          onClick={() => { setAppMode('cv'); setMobilePanel('editor'); }}
-          className={`flex flex-col items-center justify-center py-2.5 gap-1 text-[11px] font-semibold transition-colors cursor-pointer ${
-            appMode === 'cv' && mobilePanel === 'editor'
+          onClick={() => setWorkflowTab('editor')}
+          className={`flex flex-col items-center justify-center py-2.5 gap-1 text-[10px] font-semibold transition-colors cursor-pointer ${
+            workflowTab === 'editor'
               ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 border-t-2 border-indigo-600 dark:border-indigo-400'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
           }`}
         >
           <FileIcon size={16} />
-          <span>{resumeData.language === 'fr' ? 'Éditeur CV' : 'CV Editor'}</span>
+          <span>{resumeData.language === 'fr' ? 'Éditeur' : 'Editor'}</span>
         </button>
 
         <button
           type="button"
-          onClick={() => setMobilePanel('preview')}
-          className={`flex flex-col items-center justify-center py-2.5 gap-1 text-[11px] font-semibold transition-colors cursor-pointer relative ${
-            mobilePanel === 'preview'
+          onClick={() => setWorkflowTab('ats')}
+          className={`flex flex-col items-center justify-center py-2.5 gap-1 text-[10px] font-semibold transition-colors cursor-pointer relative ${
+            workflowTab === 'ats'
               ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 border-t-2 border-indigo-600 dark:border-indigo-400'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
           }`}
         >
           <div className="flex items-center gap-1">
-            <Eye size={16} />
+            <Target size={16} />
             {atsResult.targetKeywords.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
+              <span className="px-1 py-0.2 rounded-full text-[9px] font-bold bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300">
                 {atsResult.matchScore}%
               </span>
             )}
           </div>
-          <span>{resumeData.language === 'fr' ? 'Aperçu & ATS' : 'Preview & ATS'}</span>
+          <span>ATS</span>
         </button>
 
         <button
           type="button"
-          onClick={() => { setAppMode('tracker'); setMobilePanel('editor'); }}
-          className={`flex flex-col items-center justify-center py-2.5 gap-1 text-[11px] font-semibold transition-colors cursor-pointer ${
-            appMode === 'tracker' && mobilePanel === 'editor'
+          onClick={() => setWorkflowTab('preview')}
+          className={`flex flex-col items-center justify-center py-2.5 gap-1 text-[10px] font-semibold transition-colors cursor-pointer ${
+            workflowTab === 'preview'
               ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 border-t-2 border-indigo-600 dark:border-indigo-400'
-              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+          }`}
+        >
+          <Eye size={16} />
+          <span>{resumeData.language === 'fr' ? 'Aperçu' : 'Preview'}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setWorkflowTab('tracker')}
+          className={`flex flex-col items-center justify-center py-2.5 gap-1 text-[10px] font-semibold transition-colors cursor-pointer ${
+            workflowTab === 'tracker'
+              ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-950/30 border-t-2 border-indigo-600 dark:border-indigo-400'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
           }`}
         >
           <Briefcase size={16} />
@@ -784,14 +991,35 @@ function App() {
         </button>
       </nav>
 
-      <ImportModal isOpen={showImportOpen} onClose={() => setShowImportOpen(false)} onImport={handleImport} language={resumeData.language} />
-      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} language={resumeData.language} />
-
       {/* Floating AI Chat Assistant */}
       <AIChatWidget
         resumeData={resumeData}
         selectedApplication={selectedApplication}
         onOpenSettings={() => setShowSettings(true)}
+      />
+
+      {/* Modals */}
+      <ImportModal 
+        isOpen={showImportOpen} 
+        onClose={() => setShowImportOpen(false)} 
+        onImport={handleImport} 
+        language={resumeData.language} 
+      />
+      
+      <SettingsModal 
+        isOpen={showSettings} 
+        onClose={() => setShowSettings(false)} 
+        language={resumeData.language} 
+      />
+
+      <VersionManager
+        data={resumeData}
+        onLoad={setResumeData}
+        language={resumeData.language}
+        activeVersion={activeVersion}
+        setActiveVersion={setActiveVersion}
+        isOpenModal={showVersionModal}
+        onCloseModal={() => setShowVersionModal(false)}
       />
     </div>
   );

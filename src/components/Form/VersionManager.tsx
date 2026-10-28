@@ -10,9 +10,11 @@ interface Props {
   language: 'en' | 'fr';
   activeVersion: { id: string; name: string; isLocked?: boolean } | null;
   setActiveVersion: (ver: { id: string; name: string; isLocked?: boolean } | null) => void;
+  isOpenModal?: boolean;
+  onCloseModal?: () => void;
 }
 
-export default function VersionManager({ data, onLoad, language, activeVersion, setActiveVersion }: Props) {
+export default function VersionManager({ data, onLoad, language, activeVersion, setActiveVersion, isOpenModal, onCloseModal }: Props) {
   const [versions, setVersions] = useState<SavedVersion[]>([]);
   const [newVersionName, setNewVersionName] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
@@ -508,6 +510,183 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
 
   const isFrench = language === 'fr';
 
+  const renderInnerContent = () => (
+    <div className="space-y-4">
+      {message && (
+        <div className="p-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/50 rounded text-xs text-center animate-fade-in font-medium">
+          {message}
+        </div>
+      )}
+
+      {activeVersion && (
+        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 p-3 bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100/80 dark:border-indigo-900/60 rounded-lg shadow-sm">
+          <div className="text-xs min-w-0">
+            <span className="text-gray-500 dark:text-gray-400 font-medium">{isFrench ? "Version active : " : "Active version: "}</span>
+            <span className="font-bold text-indigo-700 dark:text-indigo-300 block sm:inline truncate">
+              {activeVersion.isLocked && <Lock size={10} className="text-red-500 inline mr-1 shrink-0" />}
+              {activeVersion.name}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleManualUpdate}
+            disabled={isLoading || activeVersion.isLocked}
+            className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold shadow-sm transition-all shrink-0 cursor-pointer disabled:opacity-50"
+            title={activeVersion.isLocked ? (isFrench ? "Impossible d'écraser un CV verrouillé" : "Cannot overwrite a locked CV") : ""}
+          >
+            <Save size={13} />
+            {isFrench ? "Enregistrer" : "Save changes"}
+          </button>
+        </div>
+      )}
+
+      {/* Form to Save Current CV */}
+      <form onSubmit={handleSave} className="flex gap-2">
+        <input 
+          type="text" 
+          value={newVersionName}
+          onChange={(e) => setNewVersionName(e.target.value)}
+          placeholder={isFrench ? "Créer une version (ex: Développeur React - Google...)" : "e.g. React Dev - Google..."}
+          className="flex-1 min-w-0 p-2 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+          maxLength={40}
+          required
+          disabled={isLoading}
+        />
+        <button 
+          type="submit"
+          disabled={isLoading}
+          className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+        >
+          <Save size={14} />
+          {isFrench ? 'Créer' : 'Create'}
+        </button>
+      </form>
+
+      {/* List of Saved Versions */}
+      <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+        {versions.map(v => (
+          <div 
+            key={v.id} 
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 border border-gray-100 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
+          >
+            <div className="flex-1 min-w-0 sm:mr-3">
+              <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 truncate flex items-center gap-1">
+                {v.isLocked && <Lock size={10} className="text-red-500 shrink-0" />}
+                <span className="truncate">{v.name}</span>
+              </div>
+              <div className="text-[9px] text-gray-400 dark:text-gray-500 mt-0.5">{isFrench ? 'Modifié le : ' : 'Updated: '}{v.updatedAt}</div>
+            </div>
+            
+            <div className="flex items-center justify-end gap-1.5 shrink-0">
+              <button 
+                onClick={() => handleSetDefault(v.id)}
+                disabled={isLoading}
+                className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-50 ${
+                  defaultVersionId === v.id
+                    ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40' 
+                    : 'text-gray-400 hover:text-amber-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+                title={
+                  defaultVersionId === v.id
+                    ? (isFrench ? 'Version par défaut (cliquer pour désactiver)' : 'Default version (click to unset)')
+                    : (isFrench ? 'Définir comme version par défaut' : 'Set as default version')
+                }
+              >
+                <Star size={14} fill={defaultVersionId === v.id ? 'currentColor' : 'none'} />
+              </button>
+              <button 
+                onClick={() => handleToggleLock(v.id)}
+                disabled={isLoading}
+                className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-50 ${
+                  v.isLocked
+                    ? 'text-red-500 hover:text-red-650 hover:bg-red-50 dark:hover:bg-red-950/40' 
+                    : 'text-gray-400 hover:text-indigo-500 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+                title={
+                  v.isLocked
+                    ? (isFrench ? 'Version verrouillée (la modification créera une copie)' : 'Locked version (modifications will auto-branch)')
+                    : (isFrench ? 'Verrouiller cette version' : 'Lock this version')
+                }
+              >
+                {v.isLocked ? <Lock size={14} /> : <Unlock size={14} />}
+              </button>
+              {v.id !== 'initial' && (
+                <button 
+                  onClick={() => handleRename(v.id, v.name)}
+                  disabled={isLoading}
+                  className="p-1 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-400 hover:text-indigo-500 rounded transition-colors cursor-pointer disabled:opacity-50"
+                  title={isFrench ? 'Renommer' : 'Rename'}
+                >
+                  <Edit2 size={14} />
+                </button>
+              )}
+              <button 
+                onClick={() => handleLoad(v)}
+                disabled={isLoading}
+                className="p-1 hover:bg-blue-50 dark:hover:bg-blue-955/40 text-blue-600 dark:text-blue-400 hover:text-blue-800 rounded transition-colors cursor-pointer disabled:opacity-50"
+                title={isFrench ? 'Charger cette version' : 'Load this version'}
+              >
+                <FolderOpen size={14} />
+              </button>
+              <button 
+                onClick={() => handleDuplicate(v)}
+                disabled={isLoading}
+                className="p-1 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 rounded transition-colors cursor-pointer disabled:opacity-50"
+                title={isFrench ? 'Dupliquer' : 'Duplicate'}
+              >
+                <Copy size={14} />
+              </button>
+              {v.id !== 'initial' && (
+                <button 
+                  onClick={() => handleDelete(v.id, v.name)}
+                  disabled={isLoading || v.isLocked}
+                  className="p-1 hover:bg-red-50 dark:hover:bg-red-955/40 text-red-500 dark:text-red-400 hover:text-red-700 rounded transition-colors cursor-pointer disabled:opacity-50 disabled:hover:bg-transparent"
+                  title={v.isLocked ? (isFrench ? 'Déverrouillez pour supprimer' : 'Unlock to delete') : (isFrench ? 'Supprimer' : 'Delete')}
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (isOpenModal !== undefined) {
+    if (!isOpenModal) return null;
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh] overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50 dark:bg-gray-950 shrink-0">
+            <div className="flex items-center gap-2">
+              {isCloud ? (
+                <Cloud size={18} className="text-emerald-500 shrink-0" />
+              ) : (
+                <Database size={18} className="text-indigo-500 shrink-0" />
+              )}
+              <h3 className="font-semibold text-sm text-gray-800 dark:text-gray-200">
+                {isCloud 
+                  ? (isFrench ? 'Gestionnaire de Versions (Cloud)' : 'Version Manager (Cloud)')
+                  : (isFrench ? 'Gestionnaire de Versions (Local)' : 'Version Manager (Local)')}
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={onCloseModal}
+              className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 text-2xl leading-none cursor-pointer p-1"
+            >
+              &times;
+            </button>
+          </div>
+          <div className="p-5 overflow-y-auto">
+            {renderInnerContent()}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800">
       <button 
@@ -530,145 +709,8 @@ export default function VersionManager({ data, onLoad, language, activeVersion, 
       </button>
 
       {isExpanded && (
-        <div className="p-3 sm:p-4 border-t border-gray-200 dark:border-gray-800 space-y-4">
-          {message && (
-            <div className="p-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/50 rounded text-xs text-center animate-fade-in font-medium">
-              {message}
-            </div>
-          )}
-
-          {activeVersion && (
-            <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 p-3 bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100/80 dark:border-indigo-900/60 rounded-lg shadow-sm">
-              <div className="text-xs min-w-0">
-                <span className="text-gray-500 dark:text-gray-400 font-medium">{isFrench ? "Version active : " : "Active version: "}</span>
-                <span className="font-bold text-indigo-700 dark:text-indigo-300 block sm:inline truncate">
-                  {activeVersion.isLocked && <Lock size={10} className="text-red-500 inline mr-1 shrink-0" />}
-                  {activeVersion.name}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={handleManualUpdate}
-                disabled={isLoading || activeVersion.isLocked}
-                className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold shadow-sm transition-all shrink-0 cursor-pointer disabled:opacity-50"
-                title={activeVersion.isLocked ? (isFrench ? "Impossible d'écraser un CV verrouillé" : "Cannot overwrite a locked CV") : ""}
-              >
-                <Save size={13} />
-                {isFrench ? "Enregistrer" : "Save changes"}
-              </button>
-            </div>
-          )}
-
-          {/* Form to Save Current CV */}
-          <form onSubmit={handleSave} className="flex gap-2">
-            <input 
-              type="text" 
-              value={newVersionName}
-              onChange={(e) => setNewVersionName(e.target.value)}
-              placeholder={isFrench ? "Ex: Développeur React - Google..." : "e.g. React Dev - Google..."}
-              className="flex-1 min-w-0 p-2 text-xs bg-white text-gray-900 border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100 rounded focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
-              maxLength={40}
-              required
-              disabled={isLoading}
-            />
-            <button 
-              type="submit"
-              disabled={isLoading}
-              className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50 shrink-0"
-            >
-              <Save size={14} />
-              {isFrench ? 'Sauver' : 'Save'}
-            </button>
-          </form>
-
-          {/* List of Saved Versions */}
-          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-            {versions.map(v => (
-              <div 
-                key={v.id} 
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 border border-gray-100 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
-              >
-                <div className="flex-1 min-w-0 sm:mr-3">
-                  <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 truncate flex items-center gap-1">
-                    {v.isLocked && <Lock size={10} className="text-red-500 shrink-0" />}
-                    <span className="truncate">{v.name}</span>
-                  </div>
-                  <div className="text-[9px] text-gray-400 dark:text-gray-500 mt-0.5">{isFrench ? 'Modifié le : ' : 'Updated: '}{v.updatedAt}</div>
-                </div>
-                
-                <div className="flex items-center justify-end gap-1.5 shrink-0">
-                  <button 
-                    onClick={() => handleSetDefault(v.id)}
-                    disabled={isLoading}
-                    className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-50 ${
-                      defaultVersionId === v.id
-                        ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40' 
-                        : 'text-gray-400 hover:text-amber-500 hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                    title={
-                      defaultVersionId === v.id
-                        ? (isFrench ? 'Version par défaut (cliquer pour désactiver)' : 'Default version (click to unset)')
-                        : (isFrench ? 'Définir comme version par défaut' : 'Set as default version')
-                    }
-                  >
-                    <Star size={14} fill={defaultVersionId === v.id ? 'currentColor' : 'none'} />
-                  </button>
-                  <button 
-                    onClick={() => handleToggleLock(v.id)}
-                    disabled={isLoading}
-                    className={`p-1 rounded transition-colors cursor-pointer disabled:opacity-50 ${
-                      v.isLocked
-                        ? 'text-red-500 hover:text-red-650 hover:bg-red-50 dark:hover:bg-red-950/40' 
-                        : 'text-gray-400 hover:text-indigo-500 hover:bg-gray-50 dark:hover:bg-gray-800'
-                    }`}
-                    title={
-                      v.isLocked
-                        ? (isFrench ? 'Version verrouillée (la modification créera une copie)' : 'Locked version (modifications will auto-branch)')
-                        : (isFrench ? 'Verrouiller cette version' : 'Lock this version')
-                    }
-                  >
-                    {v.isLocked ? <Lock size={14} /> : <Unlock size={14} />}
-                  </button>
-                  {v.id !== 'initial' && (
-                    <button 
-                      onClick={() => handleRename(v.id, v.name)}
-                      disabled={isLoading}
-                      className="p-1 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-400 hover:text-indigo-500 rounded transition-colors cursor-pointer disabled:opacity-50"
-                      title={isFrench ? 'Renommer' : 'Rename'}
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                  )}
-                  <button 
-                    onClick={() => handleLoad(v)}
-                    disabled={isLoading}
-                    className="p-1 hover:bg-blue-50 dark:hover:bg-blue-955/40 text-blue-600 dark:text-blue-400 hover:text-blue-800 rounded transition-colors cursor-pointer disabled:opacity-50"
-                    title={isFrench ? 'Charger cette version' : 'Load this version'}
-                  >
-                    <FolderOpen size={14} />
-                  </button>
-                  <button 
-                    onClick={() => handleDuplicate(v)}
-                    disabled={isLoading}
-                    className="p-1 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 rounded transition-colors cursor-pointer disabled:opacity-50"
-                    title={isFrench ? 'Dupliquer' : 'Duplicate'}
-                  >
-                    <Copy size={14} />
-                  </button>
-                  {v.id !== 'initial' && (
-                    <button 
-                      onClick={() => handleDelete(v.id, v.name)}
-                      disabled={isLoading || v.isLocked}
-                      className="p-1 hover:bg-red-50 dark:hover:bg-red-955/40 text-red-500 dark:text-red-400 hover:text-red-700 rounded transition-colors cursor-pointer disabled:opacity-50 disabled:hover:bg-transparent"
-                      title={v.isLocked ? (isFrench ? 'Déverrouillez pour supprimer' : 'Unlock to delete') : (isFrench ? 'Supprimer' : 'Delete')}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="p-3 sm:p-4 border-t border-gray-200 dark:border-gray-800">
+          {renderInnerContent()}
         </div>
       )}
     </div>

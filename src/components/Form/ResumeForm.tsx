@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ResumeData, Experience, Education } from '../../types/resume';
-import { ChevronDown, ChevronUp, Plus, Trash2, Sparkles, Loader2, FileText, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, Sparkles, Loader2, FileText, X, FolderOpen } from 'lucide-react';
 import { getTranslation } from '../../i18n/translations';
 import AIRewriteModal from './AIRewriteModal';
 import AIGlobalOptimizeModal from './AIGlobalOptimizeModal';
@@ -16,9 +16,10 @@ interface Props {
   missingKeywords?: string[];
   activeVersion: { id: string; name: string } | null;
   setActiveVersion: (ver: { id: string; name: string } | null) => void;
+  onOpenVersions?: () => void;
 }
 
-export default function ResumeForm({ data, onChange, missingKeywords = [], activeVersion, setActiveVersion }: Props) {
+export default function ResumeForm({ data, onChange, missingKeywords = [], activeVersion, setActiveVersion, onOpenVersions }: Props) {
   const [openSection, setOpenSection] = useState<string | null>('personal');
   const [rewriteIndex, setRewriteIndex] = useState<string | null>(null);
   const [rewriteSkillsOpen, setRewriteSkillsOpen] = useState(false);
@@ -176,13 +177,42 @@ export default function ResumeForm({ data, onChange, missingKeywords = [], activ
 
   return (
     <div className="space-y-4">
-      <VersionManager 
-        data={data} 
-        onLoad={onChange} 
-        language={data.language} 
-        activeVersion={activeVersion}
-        setActiveVersion={setActiveVersion}
-      />
+      {onOpenVersions ? (
+        <div className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-xs transition-colors">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+              <FolderOpen size={16} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-gray-500 dark:text-gray-400">{data.language === 'fr' ? 'Version active :' : 'Active version:'}</span>
+                <span className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">
+                  {activeVersion?.name || (data.language === 'fr' ? 'CV actuel' : 'Current CV')}
+                </span>
+                {activeVersion && (activeVersion as any).isLocked && <span className="text-[10px]">🔒</span>}
+              </div>
+              <p className="text-[10px] text-gray-400">
+                {data.language === 'fr' ? 'Modifications enregistrées automatiquement' : 'Changes automatically saved'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenVersions}
+            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/50 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition-colors cursor-pointer shrink-0"
+          >
+            {data.language === 'fr' ? 'Gérer les versions' : 'Manage versions'}
+          </button>
+        </div>
+      ) : (
+        <VersionManager 
+          data={data} 
+          onLoad={onChange} 
+          language={data.language} 
+          activeVersion={activeVersion}
+          setActiveVersion={setActiveVersion}
+        />
+      )}
 
       <button 
         onClick={() => setGlobalOptimizeOpen(true)}
